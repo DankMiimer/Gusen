@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gusen Character Game</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Arial', sans-serif;
+        }
+
+        #gameContainer {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+
+        canvas {
+            border: 3px solid #333;
+            display: block;
+            background: #87ceeb;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+
+        #controls {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f0f0f0;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        h1 {
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            margin-bottom: 20px;
+        }
+
+        .info {
+            color: #333;
+            margin: 5px 0;
+        }
+
+        .key {
+            display: inline-block;
+            padding: 5px 10px;
+            background: #667eea;
+            color: white;
+            border-radius: 3px;
+            margin: 0 3px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎮 Gusen Character Game 🎮</h1>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <div id="controls">
+            <div class="info">
+                <strong>Controls:</strong>
+                <span class="key">↑</span>
+                <span class="key">↓</span>
+                <span class="key">←</span>
+                <span class="key">→</span>
+                to move player
+            </div>
+            <div class="info">
+                <strong>Goal:</strong> Explore the world and interact with other characters!
+            </div>
+            <div class="info" id="score">Score: 0</div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Game state
+        const game = {
+            score: 0,
+            frame: 0,
+            keys: {},
+            characters: [],
+            player: null
+        };
+
+        // Sprite class to handle 2-frame animations
+        class Character {
+            constructor(imagePath, x, y, isPlayer = false) {
+                this.x = x;
+                this.y = y;
+                this.width = 32;
+                this.height = 32;
+                this.speed = isPlayer ? 3 : 1;
+                this.isPlayer = isPlayer;
+                this.image = new Image();
+                this.image.src = imagePath;
+                this.loaded = false;
+                this.currentFrame = 0;
+                this.frameTimer = 0;
+                this.frameDelay = 15; // Frames between sprite animation
+
+                // Movement for NPCs
+                if (!isPlayer) {
+                    this.dirX = (Math.random() - 0.5) * 2;
+                    this.dirY = (Math.random() - 0.5) * 2;
+                    this.changeDirectionTimer = 0;
+                }
+
+                this.image.onload = () => {
+                    this.loaded = true;
+                    // Image is split horizontally: top half is frame 0, bottom half is frame 1
+                    this.frameHeight = this.image.height / 2;
+                    this.frameWidth = this.image.width;
+                };
+            }
+
+            update() {
+                // Update animation
+                this.frameTimer++;
+                if (this.frameTimer >= this.frameDelay) {
+                    this.currentFrame = (this.currentFrame + 1) % 2;
+                    this.frameTimer = 0;
+                }
+
+                if (this.isPlayer) {
+                    // Player movement
+                    if (game.keys['ArrowUp'] || game.keys['w']) this.y -= this.speed;
+                    if (game.keys['ArrowDown'] || game.keys['s']) this.y += this.speed;
+                    if (game.keys['ArrowLeft'] || game.keys['a']) this.x -= this.speed;
+                    if (game.keys['ArrowRight'] || game.keys['d']) this.x += this.speed;
+
+                    // Keep player in bounds
+                    this.x = Math.max(0, Math.min(canvas.width - this.width, this.x));
+                    this.y = Math.max(0, Math.min(canvas.height - this.height, this.y));
+                } else {
+                    // NPC movement
+                    this.changeDirectionTimer++;
+                    if (this.changeDirectionTimer > 120) {
+                        this.dirX = (Math.random() - 0.5) * 2;
+                        this.dirY = (Math.random() - 0.5) * 2;
+                        this.changeDirectionTimer = 0;
+                    }
+
+                    this.x += this.dirX * this.speed;
+                    this.y += this.dirY * this.speed;
+
+                    // Bounce off walls
+                    if (this.x < 0 || this.x > canvas.width - this.width) {
+                        this.dirX *= -1;
+                        this.x = Math.max(0, Math.min(canvas.width - this.width, this.x));
+                    }
+                    if (this.y < 0 || this.y > canvas.height - this.height) {
+                        this.dirY *= -1;
+                        this.y = Math.max(0, Math.min(canvas.height - this.height, this.y));
+                    }
+                }
+            }
+
+            draw() {
+                if (!this.loaded) return;
+
+                // Draw the current frame (split horizontally)
+                ctx.drawImage(
+                    this.image,
+                    0, // source x
+                    this.currentFrame * this.frameHeight, // source y (0 for frame 0, frameHeight for frame 1)
+                    this.frameWidth, // source width
+                    this.frameHeight, // source height
+                    this.x, // destination x
+                    this.y, // destination y
+                    this.width, // destination width
+                    this.height // destination height
+                );
+
+                // Draw name tag for player
+                if (this.isPlayer) {
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    ctx.fillRect(this.x - 5, this.y - 15, 42, 12);
+                    ctx.fillStyle = 'white';
+                    ctx.font = '10px Arial';
+                    ctx.fillText('YOU', this.x, this.y - 6);
+                }
+            }
+
+            checkCollision(other) {
+                return this.x < other.x + other.width &&
+                       this.x + this.width > other.x &&
+                       this.y < other.y + other.height &&
+                       this.y + this.height > other.y;
+            }
+        }
+
+        // Initialize game
+        function init() {
+            // Create player
+            game.player = new Character('player.png', 400, 300, true);
+            game.characters.push(game.player);
+
+            // Create NPCs with different sprites
+            const npcSprites = [
+                'npc1.png',
+                'npc2.png',
+                'sprite.png',
+                'sprite2.png',
+                'sprite3.png',
+                'sprite4.png',
+                'sprite5.png',
+                'dinggusen.png',
+                'gressgusen.png',
+                'lanternegusen.png',
+                'lunagusen.png',
+                'spaghettigusen.png',
+                'wirelessgusen.png',
+                'generatorgusen.png'
+            ];
+
+            // Create NPCs at random positions
+            for (let i = 0; i < 8; i++) {
+                const sprite = npcSprites[i % npcSprites.length];
+                const x = Math.random() * (canvas.width - 32);
+                const y = Math.random() * (canvas.height - 32);
+                game.characters.push(new Character(sprite, x, y, false));
+            }
+        }
+
+        // Game loop
+        function gameLoop() {
+            // Clear canvas
+            ctx.fillStyle = '#87ceeb';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw ground/grass pattern
+            ctx.fillStyle = '#90ee90';
+            for (let i = 0; i < canvas.width; i += 40) {
+                for (let j = 0; j < canvas.height; j += 40) {
+                    if ((i + j) % 80 === 0) {
+                        ctx.fillRect(i, j, 40, 40);
+                    }
+                }
+            }
+
+            // Update and draw all characters
+            game.characters.forEach(char => {
+                char.update();
+            });
+
+            // Check collisions between player and NPCs
+            if (game.player) {
+                game.characters.forEach(char => {
+                    if (!char.isPlayer && char.loaded && game.player.checkCollision(char)) {
+                        // Simple collision response - bounce back
+                        if (game.frame % 60 === 0) {
+                            game.score += 10;
+                            document.getElementById('score').textContent = 'Score: ' + game.score;
+                        }
+                    }
+                });
+            }
+
+            // Draw all characters
+            game.characters.forEach(char => {
+                char.draw();
+            });
+
+            // Draw UI
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(10, 10, 200, 30);
+            ctx.fillStyle = 'white';
+            ctx.font = '16px Arial';
+            ctx.fillText('Characters: ' + game.characters.length, 20, 30);
+
+            game.frame++;
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Event listeners
+        window.addEventListener('keydown', (e) => {
+            game.keys[e.key] = true;
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
+                e.preventDefault();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            game.keys[e.key] = false;
+        });
+
+        // Start game
+        init();
+        gameLoop();
+    </script>
+</body>
+</html>

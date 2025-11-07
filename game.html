@@ -116,8 +116,14 @@
             assetsLoaded: 0,
             totalAssets: 0,
             gameStarted: false,
-            gravity: 0.5,
-            platforms: []
+            gravity: 0.4,
+            platforms: [],
+            camera: {
+                x: 0,
+                y: 0
+            },
+            worldWidth: 3200,  // Much wider world for sidescrolling
+            worldHeight: 600
         };
 
         // Platform class
@@ -130,13 +136,13 @@
                 this.color = color;
             }
 
-            draw() {
+            draw(cameraX, cameraY) {
                 ctx.fillStyle = this.color;
-                ctx.fillRect(this.x, this.y, this.width, this.height);
+                ctx.fillRect(this.x - cameraX, this.y - cameraY, this.width, this.height);
                 // Add some detail
                 ctx.strokeStyle = '#654321';
                 ctx.lineWidth = 2;
-                ctx.strokeRect(this.x, this.y, this.width, this.height);
+                ctx.strokeRect(this.x - cameraX, this.y - cameraY, this.width, this.height);
             }
 
             checkCollision(character) {
@@ -159,8 +165,8 @@
                 this.height = 64; // Will be adjusted when image loads
                 this.velocityX = 0;
                 this.velocityY = 0;
-                this.speed = isPlayer ? 5 : 2;
-                this.jumpPower = isPlayer ? -12 : -10;
+                this.speed = isPlayer ? 3 : 1.5;
+                this.jumpPower = isPlayer ? -9 : -8;
                 this.isPlayer = isPlayer;
                 this.onGround = false;
                 this.image = new Image();
@@ -316,7 +322,7 @@
                        this.y + this.height > platform.y;
             }
 
-            draw() {
+            draw(cameraX, cameraY) {
                 if (!this.loaded) return;
 
                 // Save context state
@@ -329,8 +335,8 @@
                     this.currentFrame * this.frameHeight, // source y (0 for frame 0, frameHeight for frame 1)
                     this.frameWidth, // source width
                     this.frameHeight, // source height
-                    Math.floor(this.x), // destination x
-                    Math.floor(this.y), // destination y
+                    Math.floor(this.x - cameraX), // destination x (camera adjusted)
+                    Math.floor(this.y - cameraY), // destination y (camera adjusted)
                     this.width, // destination width (scaled)
                     this.height // destination height (scaled)
                 );
@@ -338,11 +344,11 @@
                 // Draw name tag for player
                 if (this.isPlayer) {
                     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-                    ctx.fillRect(this.x, this.y - 20, this.width, 15);
+                    ctx.fillRect(this.x - cameraX, this.y - cameraY - 20, this.width, 15);
                     ctx.fillStyle = 'white';
                     ctx.font = 'bold 12px Arial';
                     ctx.textAlign = 'center';
-                    ctx.fillText('PLAYER', this.x + this.width / 2, this.y - 8);
+                    ctx.fillText('PLAYER', this.x - cameraX + this.width / 2, this.y - cameraY - 8);
                 }
 
                 ctx.restore();
@@ -358,25 +364,65 @@
 
         // Initialize game
         function init() {
-            // Create platforms for the platformer level
-            // Ground
-            game.platforms.push(new Platform(0, 550, canvas.width, 50, '#2d5016'));
+            // Create platforms for the platformer level - Complex sidescrolling level
+            // Ground sections (with gaps for challenge)
+            game.platforms.push(new Platform(0, 550, 400, 50, '#2d5016'));
+            game.platforms.push(new Platform(600, 550, 400, 50, '#2d5016'));
+            game.platforms.push(new Platform(1200, 550, 500, 50, '#2d5016'));
+            game.platforms.push(new Platform(1900, 550, 400, 50, '#2d5016'));
+            game.platforms.push(new Platform(2500, 550, 700, 50, '#2d5016'));
 
-            // Various platforms at different heights
-            game.platforms.push(new Platform(100, 450, 150, 20, '#8B4513'));
-            game.platforms.push(new Platform(300, 380, 120, 20, '#8B4513'));
-            game.platforms.push(new Platform(500, 320, 150, 20, '#8B4513'));
-            game.platforms.push(new Platform(150, 260, 100, 20, '#8B4513'));
-            game.platforms.push(new Platform(400, 200, 120, 20, '#8B4513'));
-            game.platforms.push(new Platform(650, 450, 130, 20, '#8B4513'));
-            game.platforms.push(new Platform(50, 150, 100, 20, '#8B4513'));
-            game.platforms.push(new Platform(600, 150, 150, 20, '#8B4513'));
+            // Starting area - tutorial section
+            game.platforms.push(new Platform(100, 480, 120, 15, '#8B4513'));
+            game.platforms.push(new Platform(280, 420, 100, 15, '#8B4513'));
+            game.platforms.push(new Platform(450, 360, 120, 15, '#8B4513'));
 
-            // Create player on the ground
+            // First challenge - stepping stones over pit
+            game.platforms.push(new Platform(420, 480, 80, 15, '#8B4513'));
+            game.platforms.push(new Platform(520, 450, 60, 15, '#8B4513'));
+
+            // Mid-level platforms
+            game.platforms.push(new Platform(700, 480, 150, 15, '#8B4513'));
+            game.platforms.push(new Platform(900, 420, 100, 15, '#8B4513'));
+            game.platforms.push(new Platform(1050, 360, 120, 15, '#8B4513'));
+            game.platforms.push(new Platform(800, 300, 100, 15, '#8B4513'));
+            game.platforms.push(new Platform(650, 240, 120, 15, '#8B4513'));
+
+            // Tall tower section
+            game.platforms.push(new Platform(1220, 480, 100, 15, '#8B4513'));
+            game.platforms.push(new Platform(1350, 420, 90, 15, '#8B4513'));
+            game.platforms.push(new Platform(1270, 360, 90, 15, '#8B4513'));
+            game.platforms.push(new Platform(1380, 300, 90, 15, '#8B4513'));
+            game.platforms.push(new Platform(1300, 240, 100, 15, '#8B4513'));
+            game.platforms.push(new Platform(1420, 180, 120, 15, '#8B4513'));
+            game.platforms.push(new Platform(1320, 120, 100, 15, '#8B4513'));
+
+            // Long jump section
+            game.platforms.push(new Platform(1580, 380, 80, 15, '#8B4513'));
+            game.platforms.push(new Platform(1750, 350, 80, 15, '#8B4513'));
+
+            // High platforms
+            game.platforms.push(new Platform(1920, 450, 140, 15, '#8B4513'));
+            game.platforms.push(new Platform(2100, 380, 100, 15, '#8B4513'));
+            game.platforms.push(new Platform(2250, 320, 120, 15, '#8B4513'));
+            game.platforms.push(new Platform(2100, 250, 100, 15, '#8B4513'));
+            game.platforms.push(new Platform(1950, 200, 120, 15, '#8B4513'));
+            game.platforms.push(new Platform(2100, 140, 100, 15, '#8B4513'));
+
+            // Final section - descending platforms
+            game.platforms.push(new Platform(2420, 480, 100, 15, '#8B4513'));
+            game.platforms.push(new Platform(2580, 420, 120, 15, '#8B4513'));
+            game.platforms.push(new Platform(2750, 360, 100, 15, '#8B4513'));
+            game.platforms.push(new Platform(2900, 300, 140, 15, '#8B4513'));
+            game.platforms.push(new Platform(2700, 220, 120, 15, '#8B4513'));
+            game.platforms.push(new Platform(2880, 160, 100, 15, '#8B4513'));
+            game.platforms.push(new Platform(3050, 480, 150, 15, '#8B4513'));
+
+            // Create player at start
             game.player = new Character('player.png', 100, 480, true);
             game.characters.push(game.player);
 
-            // Create NPCs with different sprites on various platforms
+            // Create NPCs with different sprites throughout the level
             const npcSprites = [
                 'npc1.png',
                 'npc2.png',
@@ -394,23 +440,30 @@
                 'generatorgusen.png'
             ];
 
-            // Place NPCs on different platforms
+            // Place NPCs throughout the level on various platforms
             const npcPositions = [
-                { x: 120, y: 380 },  // On first platform
-                { x: 320, y: 310 },  // On second platform
-                { x: 520, y: 250 },  // On third platform
-                { x: 170, y: 190 },  // On fourth platform
-                { x: 420, y: 130 },  // On fifth platform
-                { x: 670, y: 380 },  // On sixth platform
+                { x: 120, y: 410 },   // Starting area
+                { x: 300, y: 350 },   // Early platforms
+                { x: 720, y: 410 },   // Mid section
+                { x: 920, y: 350 },   // Mid platforms
+                { x: 1240, y: 410 },  // Tower section
+                { x: 1330, y: 290 },  // Tower middle
+                { x: 1340, y: 50 },   // Tower top
+                { x: 1600, y: 310 },  // Jump section
+                { x: 2120, y: 310 },  // High section
+                { x: 2270, y: 250 },  // Peak area
+                { x: 2600, y: 350 },  // Final section
+                { x: 3070, y: 410 },  // End area
             ];
 
-            for (let i = 0; i < 6; i++) {
-                const sprite = npcSprites[i % npcSprites.length];
+            for (let i = 0; i < Math.min(npcPositions.length, npcSprites.length); i++) {
+                const sprite = npcSprites[i];
                 const pos = npcPositions[i];
                 game.characters.push(new Character(sprite, pos.x, pos.y, false));
             }
 
             console.log(`Platformer initialized with ${game.characters.length} characters and ${game.platforms.length} platforms`);
+            console.log(`World size: ${game.worldWidth}x${game.worldHeight}`);
             console.log(`Loading ${game.totalAssets} assets...`);
         }
 
@@ -434,24 +487,56 @@
                 return;
             }
 
-            // Draw clouds
+            // Update camera to follow player (centered, with world bounds)
+            if (game.player) {
+                // Center camera on player
+                game.camera.x = game.player.x - canvas.width / 2 + game.player.width / 2;
+                game.camera.y = game.player.y - canvas.height / 2 + game.player.height / 2;
+
+                // Keep camera within world bounds
+                game.camera.x = Math.max(0, Math.min(game.camera.x, game.worldWidth - canvas.width));
+                game.camera.y = Math.max(0, Math.min(game.camera.y, game.worldHeight - canvas.height));
+            }
+
+            // Draw parallax clouds (slower movement for depth effect)
             ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            const cloudParallax = game.camera.x * 0.3; // Move slower than camera
+
             ctx.beginPath();
-            ctx.arc(100, 80, 30, 0, Math.PI * 2);
-            ctx.arc(130, 80, 40, 0, Math.PI * 2);
-            ctx.arc(160, 80, 30, 0, Math.PI * 2);
+            ctx.arc(100 - cloudParallax, 80, 30, 0, Math.PI * 2);
+            ctx.arc(130 - cloudParallax, 80, 40, 0, Math.PI * 2);
+            ctx.arc(160 - cloudParallax, 80, 30, 0, Math.PI * 2);
             ctx.fill();
 
             ctx.beginPath();
-            ctx.arc(500, 120, 35, 0, Math.PI * 2);
-            ctx.arc(535, 120, 45, 0, Math.PI * 2);
-            ctx.arc(575, 120, 35, 0, Math.PI * 2);
+            ctx.arc(500 - cloudParallax, 120, 35, 0, Math.PI * 2);
+            ctx.arc(535 - cloudParallax, 120, 45, 0, Math.PI * 2);
+            ctx.arc(575 - cloudParallax, 120, 35, 0, Math.PI * 2);
             ctx.fill();
 
-            // Draw platforms
-            game.platforms.forEach(platform => {
-                platform.draw();
-            });
+            ctx.beginPath();
+            ctx.arc(1000 - cloudParallax, 90, 32, 0, Math.PI * 2);
+            ctx.arc(1035 - cloudParallax, 90, 42, 0, Math.PI * 2);
+            ctx.arc(1070 - cloudParallax, 90, 32, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(1600 - cloudParallax, 100, 38, 0, Math.PI * 2);
+            ctx.arc(1640 - cloudParallax, 100, 48, 0, Math.PI * 2);
+            ctx.arc(1685 - cloudParallax, 100, 38, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(2200 - cloudParallax, 85, 33, 0, Math.PI * 2);
+            ctx.arc(2235 - cloudParallax, 85, 43, 0, Math.PI * 2);
+            ctx.arc(2270 - cloudParallax, 85, 33, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(2800 - cloudParallax, 110, 36, 0, Math.PI * 2);
+            ctx.arc(2838 - cloudParallax, 110, 46, 0, Math.PI * 2);
+            ctx.arc(2880 - cloudParallax, 110, 36, 0, Math.PI * 2);
+            ctx.fill();
 
             // Update all characters
             game.characters.forEach(char => {
@@ -471,19 +556,24 @@
                 });
             }
 
-            // Draw all characters
-            game.characters.forEach(char => {
-                char.draw();
+            // Draw platforms with camera offset
+            game.platforms.forEach(platform => {
+                platform.draw(game.camera.x, game.camera.y);
             });
 
-            // Draw UI
+            // Draw all characters with camera offset
+            game.characters.forEach(char => {
+                char.draw(game.camera.x, game.camera.y);
+            });
+
+            // Draw UI (fixed on screen, not affected by camera)
             ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-            ctx.fillRect(10, 10, 250, 50);
+            ctx.fillRect(10, 10, 280, 50);
             ctx.fillStyle = 'white';
             ctx.font = '16px Arial';
             ctx.textAlign = 'left';
-            ctx.fillText('Characters: ' + game.characters.length, 20, 30);
-            ctx.fillText('Loaded: ' + game.characters.filter(c => c.loaded).length, 20, 50);
+            ctx.fillText('Position: ' + Math.floor(game.player ? game.player.x : 0) + 'px', 20, 30);
+            ctx.fillText('Score: ' + game.score, 20, 50);
 
             game.frame++;
             requestAnimationFrame(gameLoop);

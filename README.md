@@ -1,16 +1,19 @@
 # Gusen Platformer Game 🎮
 
-A fun 2D sidescrolling platformer with sprite-based characters and 2-frame directional animations!
+A fun 2D sidescrolling platformer with sprite-based characters, smooth camera following, and 2-frame directional animations!
 
 ## Features
 
-- **Platformer Physics**: Full gravity, jumping, and collision detection
+- **Sidescrolling Camera**: Smooth camera that follows the player through a large 3200px world
+- **Platformer Physics**: Full gravity, jumping, and collision detection with balanced movement speed
+- **Complex Level Design**: 40+ platforms creating challenging jumps, tall towers, and precision platforming
 - **Animated Characters**: All characters use 2-frame directional sprite animations (frames split horizontally)
-- **Player Control**: Run and jump through multiple platforms
-- **AI NPCs**: Characters that walk, jump, and explore the platforms autonomously
-- **Score System**: Earn points by meeting other characters
+- **Player Control**: Precise run and jump mechanics through multiple platform sections
+- **AI NPCs**: 12 unique characters that walk, jump, and explore platforms autonomously throughout the level
+- **Score System**: Earn points by meeting other characters scattered across the world
 - **Beautiful Graphics**: Pixel-art style characters with smooth animations
-- **Multi-level Platforming**: Jump across various platforms at different heights
+- **Parallax Clouds**: Background clouds with depth effect that move slower than the camera
+- **Multi-section Platforming**: Tutorial area, stepping stones, tall tower climb, long jumps, and final descent
 
 ## How to Play
 
@@ -62,10 +65,18 @@ Then open: `http://localhost:8000/game.html`
 - **Up Arrow**, **W**, or **Space** - Jump (only works when on ground or platform)
 
 **Gameplay:**
-1. Jump across platforms to explore the level
-2. Meet NPCs to earn points
-3. Use momentum to reach higher platforms
-4. Watch the NPCs as they autonomously explore and jump around!
+1. Navigate through a large sidescrolling world with the camera following you
+2. Jump across platforms and gaps to progress through different sections:
+   - Starting tutorial area with easy jumps
+   - Stepping stones over pits
+   - Tall tower requiring precise climbing
+   - Long jump challenges
+   - High platform section with multi-level design
+   - Final descending platforming to the end
+3. Meet NPCs scattered throughout the level to earn points
+4. Use momentum and timing to reach difficult platforms
+5. Watch the NPCs as they autonomously explore and jump around!
+6. The camera smoothly follows you as you explore the 3200px wide world
 
 ## Character Sprites
 
@@ -85,8 +96,12 @@ The game automatically switches between frames based on the character's horizont
 
 - Built with HTML5 Canvas
 - Vanilla JavaScript (no external libraries)
-- Platformer physics with gravity and jumping
+- Smooth camera system that follows the player (centered, bounded to world)
+- Parallax scrolling clouds for depth effect
+- Large 3200x600 pixel world with 40+ platforms
+- Platformer physics with gravity (0.4), balanced jump power (-9), and slower movement speed (3px/frame)
 - Directional sprite animation system with frame splitting
 - Platform collision detection (top, bottom, and side collisions)
-- AI pathfinding for NPCs
-- Responsive controls with multiple input options
+- AI-controlled NPCs with autonomous movement and jumping
+- Responsive controls with multiple input options (arrows/WASD/Space)
+- World position tracking in UI

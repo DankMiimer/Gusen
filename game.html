@@ -123,7 +123,11 @@
                 y: 0
             },
             worldWidth: 6400,  // Much longer world for extended sidescrolling
-            worldHeight: 600
+            worldHeight: 600,
+            lives: 3,
+            isDead: false,
+            respawnTimer: 0,
+            invincibilityTimer: 0
         };
 
         // Platform class
@@ -258,7 +262,7 @@
                     }
 
                     // Change direction at edges
-                    if (this.x < 0 || this.x > canvas.width - this.width) {
+                    if (this.x < 0 || this.x > game.worldWidth - this.width) {
                         this.moveDirection *= -1;
                     }
                 }
@@ -288,8 +292,8 @@
                     this.x = 0;
                     if (!this.isPlayer) this.moveDirection = 1;
                 }
-                if (this.x > canvas.width - this.width) {
-                    this.x = canvas.width - this.width;
+                if (this.x > game.worldWidth - this.width) {
+                    this.x = game.worldWidth - this.width;
                     if (!this.isPlayer) this.moveDirection = -1;
                 }
 
@@ -312,6 +316,13 @@
                 // Save context state
                 ctx.save();
 
+                // Flashing effect during invincibility
+                if (this.isPlayer && game.invincibilityTimer > 0) {
+                    if (Math.floor(game.invincibilityTimer / 10) % 2 === 0) {
+                        ctx.globalAlpha = 0.5;
+                    }
+                }
+
                 // Draw the current frame (split horizontally)
                 ctx.drawImage(
                     this.image,
@@ -327,9 +338,10 @@
 
                 // Draw name tag for player
                 if (this.isPlayer) {
+                    ctx.globalAlpha = 1.0; // Reset alpha for text
                     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
                     ctx.fillRect(this.x - cameraX, this.y - cameraY - 20, this.width, 15);
-                    ctx.fillStyle = 'white';
+                    ctx.fillStyle = game.invincibilityTimer > 0 ? '#ffff00' : 'white';
                     ctx.font = 'bold 12px Arial';
                     ctx.textAlign = 'center';
                     ctx.fillText('PLAYER', this.x - cameraX + this.width / 2, this.y - cameraY - 8);
@@ -471,6 +483,37 @@
             console.log(`Loading ${game.totalAssets} assets...`);
         }
 
+        // Player death and respawn
+        function killPlayer() {
+            if (game.invincibilityTimer > 0 || game.isDead) return;
+
+            game.lives--;
+            game.isDead = true;
+            game.respawnTimer = 120; // 2 seconds at 60fps
+
+            // Flash effect
+            if (game.lives > 0) {
+                console.log(`Player died! Lives remaining: ${game.lives}`);
+            } else {
+                console.log('Game Over!');
+            }
+        }
+
+        function respawnPlayer() {
+            if (!game.isDead || game.respawnTimer > 0) return;
+
+            if (game.lives > 0) {
+                // Respawn at start
+                game.player.x = 100;
+                game.player.y = 480;
+                game.player.velocityX = 0;
+                game.player.velocityY = 0;
+                game.isDead = false;
+                game.invincibilityTimer = 180; // 3 seconds of invincibility
+                console.log('Respawned with invincibility!');
+            }
+        }
+
         // Draw forest background elements
         function drawForest(cameraX) {
             const parallaxBg = cameraX * 0.5; // Background elements move slower
@@ -482,17 +525,17 @@
                 const x = i * 400 - parallaxBg;
                 const treeHeight = 180 + (i % 3) * 20;
                 if (x > -100 && x < canvas.width + 100) {
-                    // Tree trunk
+                    // Tree trunk - reaches ground
                     ctx.fillStyle = '#3d2817';
-                    ctx.fillRect(x, canvas.height - 150 - treeHeight, 25, treeHeight);
+                    ctx.fillRect(x, canvas.height - treeHeight, 25, treeHeight);
 
                     // Tree canopy
                     ctx.fillStyle = '#1a4d1a';
                     ctx.beginPath();
-                    ctx.ellipse(x + 12, canvas.height - 150 - treeHeight, 50, 70, 0, 0, Math.PI * 2);
+                    ctx.ellipse(x + 12, canvas.height - treeHeight, 50, 70, 0, 0, Math.PI * 2);
                     ctx.fill();
                     ctx.beginPath();
-                    ctx.ellipse(x + 12, canvas.height - 170 - treeHeight, 40, 50, 0, 0, Math.PI * 2);
+                    ctx.ellipse(x + 12, canvas.height - treeHeight - 20, 40, 50, 0, 0, Math.PI * 2);
                     ctx.fill();
                 }
             }
@@ -502,17 +545,17 @@
                 const x = i * 250 - parallaxFg;
                 const treeHeight = 200 + (i % 4) * 25;
                 if (x > -100 && x < canvas.width + 100) {
-                    // Tree trunk
+                    // Tree trunk - reaches ground
                     ctx.fillStyle = '#4a3420';
-                    ctx.fillRect(x, canvas.height - 100 - treeHeight, 30, treeHeight);
+                    ctx.fillRect(x, canvas.height - treeHeight, 30, treeHeight);
 
                     // Tree canopy
                     ctx.fillStyle = '#2d5a2d';
                     ctx.beginPath();
-                    ctx.ellipse(x + 15, canvas.height - 100 - treeHeight, 60, 80, 0, 0, Math.PI * 2);
+                    ctx.ellipse(x + 15, canvas.height - treeHeight, 60, 80, 0, 0, Math.PI * 2);
                     ctx.fill();
                     ctx.beginPath();
-                    ctx.ellipse(x + 15, canvas.height - 130 - treeHeight, 50, 60, 0, 0, Math.PI * 2);
+                    ctx.ellipse(x + 15, canvas.height - treeHeight - 30, 50, 60, 0, 0, Math.PI * 2);
                     ctx.fill();
                 }
             }
@@ -635,19 +678,33 @@
             ctx.arc(2880 - cloudParallax, 110, 36, 0, Math.PI * 2);
             ctx.fill();
 
-            // Update all characters
-            game.characters.forEach(char => {
-                char.update();
-            });
+            // Update invincibility and respawn timers
+            if (game.invincibilityTimer > 0) game.invincibilityTimer--;
+            if (game.respawnTimer > 0) {
+                game.respawnTimer--;
+            } else {
+                respawnPlayer();
+            }
 
-            // Check collisions between player and NPCs
-            if (game.player) {
+            // Update all characters (unless player is dead)
+            if (!game.isDead) {
+                game.characters.forEach(char => {
+                    char.update();
+                });
+            }
+
+            // Check death conditions for player
+            if (game.player && !game.isDead) {
+                // Check for falling out of world
+                if (game.player.y > game.worldHeight + 100) {
+                    killPlayer();
+                }
+
+                // Check collisions between player and NPCs (death on contact)
                 game.characters.forEach(char => {
                     if (!char.isPlayer && char.loaded && game.player.checkCollision(char)) {
-                        // Simple collision response - bounce back
-                        if (game.frame % 60 === 0) {
-                            game.score += 10;
-                            document.getElementById('score').textContent = 'Score: ' + game.score;
+                        if (game.invincibilityTimer === 0) {
+                            killPlayer();
                         }
                     }
                 });
@@ -665,12 +722,44 @@
 
             // Draw UI (fixed on screen, not affected by camera)
             ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-            ctx.fillRect(10, 10, 280, 50);
+            ctx.fillRect(10, 10, 280, 70);
             ctx.fillStyle = 'white';
             ctx.font = '16px Arial';
             ctx.textAlign = 'left';
             ctx.fillText('Position: ' + Math.floor(game.player ? game.player.x : 0) + 'px', 20, 30);
             ctx.fillText('Score: ' + game.score, 20, 50);
+
+            // Draw lives
+            ctx.fillStyle = game.lives > 0 ? '#ff0000' : '#666666';
+            ctx.fillText('Lives: ' + '♥'.repeat(game.lives), 20, 70);
+
+            // Draw death message
+            if (game.isDead) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#ff0000';
+                ctx.font = 'bold 48px Arial';
+                ctx.textAlign = 'center';
+
+                if (game.lives > 0) {
+                    ctx.fillText('YOU DIED!', canvas.width / 2, canvas.height / 2 - 40);
+                    ctx.font = '24px Arial';
+                    ctx.fillStyle = 'white';
+                    ctx.fillText('Respawning in ' + Math.ceil(game.respawnTimer / 60) + '...', canvas.width / 2, canvas.height / 2 + 20);
+                } else {
+                    ctx.fillText('GAME OVER!', canvas.width / 2, canvas.height / 2 - 40);
+                    ctx.font = '24px Arial';
+                    ctx.fillStyle = 'white';
+                    ctx.fillText('Final Score: ' + game.score, canvas.width / 2, canvas.height / 2 + 20);
+                    ctx.fillText('Refresh page to play again', canvas.width / 2, canvas.height / 2 + 60);
+                }
+            }
+
+            // Draw invincibility indicator
+            if (game.invincibilityTimer > 0 && !game.isDead) {
+                ctx.fillStyle = 'rgba(255, 255, 0, 0.3)';
+                ctx.fillRect(0, canvas.height - 10, (game.invincibilityTimer / 180) * canvas.width, 10);
+            }
 
             game.frame++;
             requestAnimationFrame(gameLoop);

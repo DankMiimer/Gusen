@@ -164,20 +164,7 @@
                 'sprite3.png', 'sprite4.png', 'sprite5.png', 'dinggusen.png',
                 'gressgusen.png', 'lanternegusen.png', 'lunagusen.png',
                 'spaghettigusen.png', 'wirelessgusen.png', 'generatorgusen.png'
-            ],
-
-            // Grass platform sprites
-            grassPlatform: {
-                left: 'Left_Grass_Platform.png',
-                middle: [
-                    'Middle_Grass_Platform.png',
-                    'Middle_Grass_Platform_Var1.png',
-                    'Middle_Grass_Platform_Var2.png',
-                    'Middle_Grass_Platform_Var3.png'
-                ],
-                right: 'Right_Grass_Platform.png',
-                tileWidth: 32  // Width of each tile
-            }
+            ]
         };
 
         // ===== INITIALIZATION =====
@@ -205,24 +192,18 @@
             assetsLoaded: 0,
             totalAssets: 0,
             gameStarted: false,
-            hasWon: false,
-            grassPlatformImages: {
-                left: null,
-                middle: [],  // Array for 4 middle tile variations
-                right: null,
-                loaded: false
-            }
+            hasWon: false
         };
 
         // ===== PLATFORM CLASS =====
         class Platform {
-            constructor(x, y, width, height, color = CONFIG.colors.platform, useGrassSprite = false) {
+            constructor(x, y, width, height, color = CONFIG.colors.platform, isGround = false) {
                 this.x = x;
                 this.y = y;
                 this.width = width;
                 this.height = height;
                 this.color = color;
-                this.useGrassSprite = useGrassSprite;
+                this.isGround = isGround;
             }
 
             draw(cameraX, cameraY) {
@@ -234,39 +215,60 @@
                     return;
                 }
 
-                // Grass sprite rendering
-                if (this.useGrassSprite && game.grassPlatformImages.loaded) {
-                    const tileWidth = CONFIG.grassPlatform.tileWidth;
-                    const leftImg = game.grassPlatformImages.left;
-                    const middleImages = game.grassPlatformImages.middle;
-                    const rightImg = game.grassPlatformImages.right;
+                // Mossy grass tile rendering for ground platforms
+                if (this.isGround) {
+                    const tileSize = 16;
+                    const numTiles = Math.ceil(this.width / tileSize);
 
-                    // Draw left cap
-                    ctx.drawImage(leftImg, screenX, screenY, tileWidth, this.height);
+                    for (let i = 0; i < numTiles; i++) {
+                        const tileX = screenX + i * tileSize;
+                        const tileWidth = Math.min(tileSize, screenX + this.width - tileX);
 
-                    // Calculate how many middle tiles we need
-                    const middleWidth = this.width - tileWidth * 2;
-                    const numMiddleTiles = Math.ceil(middleWidth / tileWidth);
+                        // Deterministic random for consistent pattern
+                        const seed = Math.floor(this.x / tileSize) + i;
 
-                    // Draw middle tiles with variety - randomly select from variations
-                    for (let i = 0; i < numMiddleTiles; i++) {
-                        const x = screenX + tileWidth + i * tileWidth;
-                        // Use consistent random selection based on platform position and tile index
-                        const randomIndex = Math.floor((this.x + i * 137) % middleImages.length);
-                        const middleImg = middleImages[randomIndex];
+                        // Dark dirt base
+                        ctx.fillStyle = '#3a5a2a';
+                        ctx.fillRect(tileX, screenY + 8, tileWidth, this.height - 8);
 
-                        // Last tile might need to be clipped to fit perfectly
-                        const remainingWidth = screenX + this.width - tileWidth - x;
-                        const drawWidth = Math.min(tileWidth, remainingWidth);
-                        ctx.drawImage(middleImg, 0, 0, drawWidth, middleImg.height, x, screenY, drawWidth, this.height);
+                        // Grass top layer (varied greens)
+                        const grassVariation = seed % 3;
+                        if (grassVariation === 0) {
+                            ctx.fillStyle = '#52be80';
+                        } else if (grassVariation === 1) {
+                            ctx.fillStyle = '#4aa876';
+                        } else {
+                            ctx.fillStyle = '#5dca8a';
+                        }
+                        ctx.fillRect(tileX, screenY, tileWidth, 8);
+
+                        // Grass tufts on top edge
+                        ctx.fillStyle = '#6ad897';
+                        for (let j = 0; j < 3; j++) {
+                            if ((seed + j) % 2 === 0) {
+                                ctx.fillRect(tileX + j * 5 + 1, screenY - 2, 2, 3);
+                            }
+                        }
+
+                        // Moss spots on dirt
+                        ctx.fillStyle = '#2d4a1a';
+                        if (seed % 5 === 0) {
+                            ctx.fillRect(tileX + 3, screenY + 12, 3, 3);
+                        }
+                        if (seed % 7 === 0) {
+                            ctx.fillRect(tileX + 10, screenY + 16, 2, 2);
+                        }
+
+                        // Darker dirt variation
+                        if (seed % 4 === 0) {
+                            ctx.fillStyle = '#2f4820';
+                            ctx.fillRect(tileX + 5, screenY + 20, 4, 4);
+                        }
                     }
-
-                    // Draw right cap
-                    ctx.drawImage(rightImg, screenX + this.width - tileWidth, screenY, tileWidth, this.height);
                     return;
                 }
 
-                // Fallback: Original pixel art style rendering
+                // Regular platform pixel art style rendering
                 ctx.fillStyle = this.color;
                 ctx.fillRect(screenX, screenY, this.width, this.height);
 
@@ -640,50 +642,7 @@
 
         // ===== GAME INITIALIZATION =====
         function init() {
-            // Load grass platform sprites (1 left + 4 middle variations + 1 right = 6 total)
-            game.totalAssets += 6;
-
-            game.grassPlatformImages.left = new Image();
-            game.grassPlatformImages.left.src = CONFIG.grassPlatform.left;
-            game.grassPlatformImages.left.onload = () => {
-                game.assetsLoaded++;
-                checkGrassPlatformsLoaded();
-            };
-            game.grassPlatformImages.left.onerror = () => {
-                console.error('Failed to load left grass platform');
-                game.assetsLoaded++;
-                checkGrassPlatformsLoaded();
-            };
-
-            // Load all 4 middle tile variations
-            CONFIG.grassPlatform.middle.forEach((src, index) => {
-                const img = new Image();
-                img.src = src;
-                img.onload = () => {
-                    game.assetsLoaded++;
-                    checkGrassPlatformsLoaded();
-                };
-                img.onerror = () => {
-                    console.error(`Failed to load middle grass platform variation ${index}`);
-                    game.assetsLoaded++;
-                    checkGrassPlatformsLoaded();
-                };
-                game.grassPlatformImages.middle.push(img);
-            });
-
-            game.grassPlatformImages.right = new Image();
-            game.grassPlatformImages.right.src = CONFIG.grassPlatform.right;
-            game.grassPlatformImages.right.onload = () => {
-                game.assetsLoaded++;
-                checkGrassPlatformsLoaded();
-            };
-            game.grassPlatformImages.right.onerror = () => {
-                console.error('Failed to load right grass platform');
-                game.assetsLoaded++;
-                checkGrassPlatformsLoaded();
-            };
-
-            // Create ground platforms with grass sprites
+            // Create ground platforms with mossy grass tiles
             LEVEL_DATA.groundPlatforms.forEach(p => {
                 game.platforms.push(new Platform(p.x, p.y, p.w, 50, CONFIG.colors.ground, true));
             });
@@ -706,23 +665,6 @@
             });
 
             console.log(`Game initialized: ${game.characters.length} characters, ${game.platforms.length} platforms`);
-        }
-
-        function checkGrassPlatformsLoaded() {
-            const leftLoaded = game.grassPlatformImages.left && game.grassPlatformImages.left.complete;
-            const allMiddleLoaded = game.grassPlatformImages.middle.length === 4 &&
-                                    game.grassPlatformImages.middle.every(img => img.complete);
-            const rightLoaded = game.grassPlatformImages.right && game.grassPlatformImages.right.complete;
-
-            if (leftLoaded && allMiddleLoaded && rightLoaded) {
-                game.grassPlatformImages.loaded = true;
-                console.log('Grass platform sprites loaded successfully (1 left + 4 middle variations + 1 right)');
-            }
-
-            if (game.assetsLoaded === game.totalAssets) {
-                game.gameStarted = true;
-                console.log('All assets loaded!');
-            }
         }
 
         // ===== DAMAGE SYSTEM =====

@@ -275,6 +275,9 @@
                     this.jumpTimer = Math.floor(Math.random() * 60) + 30;
                     this.facingRight = this.moveDirection > 0;
                     this.currentFrame = this.facingRight ? 1 : 0;
+                    this.isIdle = false;
+                    this.idleTimer = 0;
+                    this.idleCycleDuration = 120; // 2 seconds at 60fps
                 }
 
                 game.totalAssets++;
@@ -371,6 +374,28 @@
             }
 
             updateNPC() {
+                // Handle idle state
+                if (this.isIdle) {
+                    this.idleTimer++;
+                    this.velocityX = 0; // Don't move during idle
+
+                    // Slow idle animation - switch frames every half of the cycle (1 second each)
+                    const halfCycle = this.idleCycleDuration / 2;
+                    if (this.idleTimer < halfCycle) {
+                        this.currentFrame = 0; // Face left
+                    } else {
+                        this.currentFrame = 1; // Face right
+                    }
+
+                    // Exit idle state after full cycle
+                    if (this.idleTimer >= this.idleCycleDuration) {
+                        this.isIdle = false;
+                        this.idleTimer = 0;
+                        this.moveDirection *= -1; // Turn around after idle
+                    }
+                    return;
+                }
+
                 // Edge detection - check if about to walk off platform
                 if (this.onGround) {
                     const checkDistance = 30; // Look ahead 30px
@@ -387,12 +412,15 @@
                         }
                     }
 
-                    // Turn around if no platform ahead or hit world bounds
+                    // Enter idle state if no platform ahead or hit world bounds
                     if (!platformAhead || this.x <= 0 || this.x >= CONFIG.world.width - this.width) {
-                        this.moveDirection *= -1;
+                        this.isIdle = true;
+                        this.idleTimer = 0;
+                        return;
                     }
                 }
 
+                // Normal movement
                 this.velocityX = this.moveDirection * this.speed;
                 this.currentFrame = this.moveDirection > 0 ? 1 : 0;
                 this.facingRight = this.moveDirection > 0;

@@ -33,17 +33,6 @@
             image-rendering: -moz-crisp-edges;
         }
 
-        #loading {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            font-size: 24px;
-            font-weight: bold;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-        }
-
         #controls {
             margin-top: 20px;
             padding: 15px;
@@ -90,13 +79,84 @@
                 to jump
             </div>
             <div class="info">
-                <strong>Goal:</strong> Jump across platforms and meet other characters!
+                <strong>Goal:</strong> Jump across platforms and avoid NPCs!
             </div>
             <div class="info" id="score">Score: 0</div>
         </div>
     </div>
 
     <script>
+        // ===== CONFIGURATION =====
+        const CONFIG = {
+            // Canvas settings
+            canvas: {
+                width: 800,
+                height: 600
+            },
+
+            // World settings
+            world: {
+                width: 6400,
+                height: 600
+            },
+
+            // Physics settings
+            physics: {
+                gravity: 0.4,
+                terminalVelocity: 15,
+                playerSpeed: 3,
+                npcSpeed: 1.5,
+                playerJumpPower: -9,
+                npcJumpPower: -8
+            },
+
+            // Player settings
+            player: {
+                startX: 100,
+                startY: 480,
+                lives: 3,
+                invincibilityFrames: 180, // 3 seconds at 60fps
+                respawnFrames: 120 // 2 seconds at 60fps
+            },
+
+            // Sprite settings
+            sprite: {
+                scale: 4,
+                defaultWidth: 64,
+                defaultHeight: 64
+            },
+
+            // Parallax settings
+            parallax: {
+                clouds: 0.3,
+                backgroundTrees: 0.5,
+                foregroundTrees: 0.8
+            },
+
+            // Colors
+            colors: {
+                sky: '#87ceeb',
+                ground: '#2d5016',
+                platform: '#8B4513',
+                platformBorder: '#654321',
+                backgroundTree: '#1a4d1a',
+                foregroundTree: '#2d5a2d',
+                treeTrunk: '#4a3420',
+                bush: '#2d5a2d',
+                grass: '#3d7a3d',
+                flowers: ['#ffeb3b', '#ff5722', '#e91e63', '#9c27b0', '#ffffff']
+            },
+
+            // NPC sprites list
+            npcSprites: [
+                'npc1.png', 'npc2.png', 'sprite.png', 'sprite2.png',
+                'sprite3.png', 'sprite4.png', 'sprite5.png', 'dinggusen.png',
+                'gressgusen.png', 'lanternegusen.png', 'lunagusen.png',
+                'spaghettigusen.png', 'wirelessgusen.png', 'generatorgusen.png'
+            ]
+        };
+
+        // ===== INITIALIZATION =====
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
@@ -106,33 +166,27 @@
         ctx.webkitImageSmoothingEnabled = false;
         ctx.msImageSmoothingEnabled = false;
 
-        // Game state
+        // ===== GAME STATE =====
         const game = {
             score: 0,
             frame: 0,
             keys: {},
             characters: [],
             player: null,
-            assetsLoaded: 0,
-            totalAssets: 0,
-            gameStarted: false,
-            gravity: 0.4,
             platforms: [],
-            camera: {
-                x: 0,
-                y: 0
-            },
-            worldWidth: 6400,  // Much longer world for extended sidescrolling
-            worldHeight: 600,
-            lives: 3,
+            camera: { x: 0, y: 0 },
+            lives: CONFIG.player.lives,
             isDead: false,
             respawnTimer: 0,
-            invincibilityTimer: 0
+            invincibilityTimer: 0,
+            assetsLoaded: 0,
+            totalAssets: 0,
+            gameStarted: false
         };
 
-        // Platform class
+        // ===== PLATFORM CLASS =====
         class Platform {
-            constructor(x, y, width, height, color = '#8B4513') {
+            constructor(x, y, width, height, color = CONFIG.colors.platform) {
                 this.x = x;
                 this.y = y;
                 this.width = width;
@@ -141,12 +195,19 @@
             }
 
             draw(cameraX, cameraY) {
+                // Viewport culling - only draw if visible
+                const screenX = this.x - cameraX;
+                const screenY = this.y - cameraY;
+                if (screenX + this.width < 0 || screenX > CONFIG.canvas.width ||
+                    screenY + this.height < 0 || screenY > CONFIG.canvas.height) {
+                    return;
+                }
+
                 ctx.fillStyle = this.color;
-                ctx.fillRect(this.x - cameraX, this.y - cameraY, this.width, this.height);
-                // Add some detail
-                ctx.strokeStyle = '#654321';
+                ctx.fillRect(screenX, screenY, this.width, this.height);
+                ctx.strokeStyle = CONFIG.colors.platformBorder;
                 ctx.lineWidth = 2;
-                ctx.strokeRect(this.x - cameraX, this.y - cameraY, this.width, this.height);
+                ctx.strokeRect(screenX, screenY, this.width, this.height);
             }
 
             checkCollision(character) {
@@ -157,59 +218,56 @@
             }
         }
 
-        // Sprite class to handle 2-frame directional animations
-        // Frame 0 (top half) = Left movement
-        // Frame 1 (bottom half) = Right movement
+        // ===== CHARACTER CLASS =====
         class Character {
             constructor(imagePath, x, y, isPlayer = false) {
                 this.x = x;
                 this.y = y;
-                this.scale = 4; // Scale up the tiny sprites
-                this.width = 64; // Will be adjusted when image loads
-                this.height = 64; // Will be adjusted when image loads
+                this.scale = CONFIG.sprite.scale;
+                this.width = CONFIG.sprite.defaultWidth;
+                this.height = CONFIG.sprite.defaultHeight;
                 this.velocityX = 0;
                 this.velocityY = 0;
-                this.speed = isPlayer ? 3 : 1.5;
-                this.jumpPower = isPlayer ? -9 : -8;
+                this.speed = isPlayer ? CONFIG.physics.playerSpeed : CONFIG.physics.npcSpeed;
+                this.jumpPower = isPlayer ? CONFIG.physics.playerJumpPower : CONFIG.physics.npcJumpPower;
                 this.isPlayer = isPlayer;
                 this.onGround = false;
                 this.image = new Image();
                 this.image.src = imagePath;
                 this.loaded = false;
                 this.currentFrame = 1; // Start facing right
-                this.facingRight = true; // Track which direction we're facing
+                this.facingRight = true;
                 this.name = imagePath.replace('.png', '');
 
-                // Movement for NPCs
+                // NPC-specific properties
                 if (!isPlayer) {
                     this.moveDirection = Math.random() > 0.5 ? 1 : -1;
                     this.jumpTimer = Math.floor(Math.random() * 60) + 30;
-                    // Set initial frame based on initial direction
                     this.facingRight = this.moveDirection > 0;
                     this.currentFrame = this.facingRight ? 1 : 0;
                 }
 
                 game.totalAssets++;
+                this.setupImageHandlers();
+            }
 
+            setupImageHandlers() {
                 this.image.onload = () => {
                     this.loaded = true;
                     game.assetsLoaded++;
-                    // Image is split horizontally: top half is frame 0, bottom half is frame 1
                     this.frameHeight = this.image.height / 2;
                     this.frameWidth = this.image.width;
-                    // Adjust character size based on actual sprite size
                     this.width = this.frameWidth * this.scale;
                     this.height = this.frameHeight * this.scale;
-                    console.log(`Loaded ${imagePath}: ${this.frameWidth}x${this.frameHeight} (scaled to ${this.width}x${this.height})`);
 
                     if (game.assetsLoaded === game.totalAssets) {
-                        console.log('All assets loaded!');
                         game.gameStarted = true;
+                        console.log('All assets loaded!');
                     }
                 };
 
                 this.image.onerror = () => {
-                    console.error(`Failed to load image: ${imagePath}`);
+                    console.error(`Failed to load: ${this.name}`);
                     game.assetsLoaded++;
                     if (game.assetsLoaded === game.totalAssets) {
                         game.gameStarted = true;
@@ -218,67 +276,22 @@
             }
 
             update() {
-                // Apply gravity
-                this.velocityY += game.gravity;
+                this.velocityY += CONFIG.physics.gravity;
 
                 if (this.isPlayer) {
-                    // Player horizontal movement
-                    this.velocityX = 0;
-
-                    if (game.keys['ArrowLeft'] || game.keys['a']) {
-                        this.velocityX = -this.speed;
-                        this.facingRight = false;
-                        this.currentFrame = 0; // Top frame for left movement
-                    }
-                    if (game.keys['ArrowRight'] || game.keys['d']) {
-                        this.velocityX = this.speed;
-                        this.facingRight = true;
-                        this.currentFrame = 1; // Bottom frame for right movement
-                    }
-
-                    // Jump
-                    if ((game.keys['ArrowUp'] || game.keys['w'] || game.keys[' ']) && this.onGround) {
-                        this.velocityY = this.jumpPower;
-                        this.onGround = false;
-                    }
+                    this.updatePlayer();
                 } else {
-                    // NPC movement
-                    this.velocityX = this.moveDirection * this.speed;
-
-                    // Update frame based on movement direction
-                    if (this.moveDirection < 0) {
-                        this.facingRight = false;
-                        this.currentFrame = 0; // Top frame for left movement
-                    } else {
-                        this.facingRight = true;
-                        this.currentFrame = 1; // Bottom frame for right movement
-                    }
-
-                    // Random jumping
-                    this.jumpTimer--;
-                    if (this.jumpTimer <= 0 && this.onGround) {
-                        this.velocityY = this.jumpPower;
-                        this.jumpTimer = Math.floor(Math.random() * 120) + 60;
-                    }
-
-                    // Change direction at edges
-                    if (this.x < 0 || this.x > game.worldWidth - this.width) {
-                        this.moveDirection *= -1;
-                    }
+                    this.updateNPC();
                 }
 
                 // Apply velocity
                 this.x += this.velocityX;
                 this.y += this.velocityY;
 
-                // Reset ground status
+                // Platform collision (one-way platforms)
                 this.onGround = false;
-
-                // Platform collision detection (one-way platforms - can jump through from below)
                 for (let platform of game.platforms) {
                     if (this.checkPlatformCollision(platform)) {
-                        // Only collide when landing on top (coming down from above)
-                        // Allow jumping through from below
                         if (this.velocityY > 0 && this.y + this.height - this.velocityY <= platform.y + 10) {
                             this.y = platform.y - this.height;
                             this.velocityY = 0;
@@ -287,19 +300,49 @@
                     }
                 }
 
-                // Keep in bounds horizontally
-                if (this.x < 0) {
-                    this.x = 0;
-                    if (!this.isPlayer) this.moveDirection = 1;
-                }
-                if (this.x > game.worldWidth - this.width) {
-                    this.x = game.worldWidth - this.width;
-                    if (!this.isPlayer) this.moveDirection = -1;
-                }
+                // World bounds
+                this.x = Math.max(0, Math.min(this.x, CONFIG.world.width - this.width));
 
                 // Terminal velocity
-                if (this.velocityY > 15) {
-                    this.velocityY = 15;
+                if (this.velocityY > CONFIG.physics.terminalVelocity) {
+                    this.velocityY = CONFIG.physics.terminalVelocity;
+                }
+
+                // NPC bounds and direction change
+                if (!this.isPlayer && (this.x <= 0 || this.x >= CONFIG.world.width - this.width)) {
+                    this.moveDirection *= -1;
+                }
+            }
+
+            updatePlayer() {
+                this.velocityX = 0;
+
+                if (game.keys['ArrowLeft'] || game.keys['a']) {
+                    this.velocityX = -this.speed;
+                    this.facingRight = false;
+                    this.currentFrame = 0;
+                }
+                if (game.keys['ArrowRight'] || game.keys['d']) {
+                    this.velocityX = this.speed;
+                    this.facingRight = true;
+                    this.currentFrame = 1;
+                }
+
+                if ((game.keys['ArrowUp'] || game.keys['w'] || game.keys[' ']) && this.onGround) {
+                    this.velocityY = this.jumpPower;
+                    this.onGround = false;
+                }
+            }
+
+            updateNPC() {
+                this.velocityX = this.moveDirection * this.speed;
+                this.currentFrame = this.moveDirection > 0 ? 1 : 0;
+                this.facingRight = this.moveDirection > 0;
+
+                this.jumpTimer--;
+                if (this.jumpTimer <= 0 && this.onGround) {
+                    this.velocityY = this.jumpPower;
+                    this.jumpTimer = Math.floor(Math.random() * 120) + 60;
                 }
             }
 
@@ -313,38 +356,42 @@
             draw(cameraX, cameraY) {
                 if (!this.loaded) return;
 
-                // Save context state
-                ctx.save();
-
-                // Flashing effect during invincibility
-                if (this.isPlayer && game.invincibilityTimer > 0) {
-                    if (Math.floor(game.invincibilityTimer / 10) % 2 === 0) {
-                        ctx.globalAlpha = 0.5;
-                    }
+                // Viewport culling
+                const screenX = this.x - cameraX;
+                const screenY = this.y - cameraY;
+                if (screenX + this.width < -100 || screenX > CONFIG.canvas.width + 100 ||
+                    screenY + this.height < -100 || screenY > CONFIG.canvas.height + 100) {
+                    return;
                 }
 
-                // Draw the current frame (split horizontally)
+                ctx.save();
+
+                // Invincibility flash
+                if (this.isPlayer && game.invincibilityTimer > 0 && Math.floor(game.invincibilityTimer / 10) % 2 === 0) {
+                    ctx.globalAlpha = 0.5;
+                }
+
                 ctx.drawImage(
                     this.image,
-                    0, // source x
-                    this.currentFrame * this.frameHeight, // source y (0 for frame 0, frameHeight for frame 1)
-                    this.frameWidth, // source width
-                    this.frameHeight, // source height
-                    Math.floor(this.x - cameraX), // destination x (camera adjusted)
-                    Math.floor(this.y - cameraY), // destination y (camera adjusted)
-                    this.width, // destination width (scaled)
-                    this.height // destination height (scaled)
+                    0,
+                    this.currentFrame * this.frameHeight,
+                    this.frameWidth,
+                    this.frameHeight,
+                    Math.floor(screenX),
+                    Math.floor(screenY),
+                    this.width,
+                    this.height
                 );
 
-                // Draw name tag for player
+                // Player name tag
                 if (this.isPlayer) {
-                    ctx.globalAlpha = 1.0; // Reset alpha for text
+                    ctx.globalAlpha = 1.0;
                     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-                    ctx.fillRect(this.x - cameraX, this.y - cameraY - 20, this.width, 15);
+                    ctx.fillRect(screenX, screenY - 20, this.width, 15);
                     ctx.fillStyle = game.invincibilityTimer > 0 ? '#ffff00' : 'white';
                     ctx.font = 'bold 12px Arial';
                     ctx.textAlign = 'center';
-                    ctx.fillText('PLAYER', this.x - cameraX + this.width / 2, this.y - cameraY - 8);
+                    ctx.fillText('PLAYER', screenX + this.width / 2, screenY - 8);
                 }
 
                 ctx.restore();
@@ -358,327 +405,273 @@
             }
         }
 
-        // Initialize game
+        // ===== LEVEL DATA =====
+        const LEVEL_DATA = {
+            groundPlatforms: [
+                { x: 0, y: 550, w: 500 }, { x: 700, y: 550, w: 600 },
+                { x: 1500, y: 550, w: 500 }, { x: 2200, y: 550, w: 600 },
+                { x: 3000, y: 550, w: 500 }, { x: 3700, y: 550, w: 600 },
+                { x: 4500, y: 550, w: 500 }, { x: 5200, y: 550, w: 600 },
+                { x: 6000, y: 550, w: 400 }
+            ],
+            sections: [
+                // Section 1: Tutorial (0-800)
+                [
+                    { x: 100, y: 480, w: 120 }, { x: 280, y: 420, w: 100 },
+                    { x: 450, y: 360, w: 120 }, { x: 620, y: 480, w: 80 }
+                ],
+                // Section 2: Stepping stones (800-1500)
+                [
+                    { x: 850, y: 480, w: 90 }, { x: 1000, y: 420, w: 80 },
+                    { x: 1150, y: 380, w: 90 }, { x: 1300, y: 420, w: 100 }
+                ],
+                // Section 3: Mid-level maze (1500-2200)
+                [
+                    { x: 1550, y: 480, w: 120 }, { x: 1730, y: 420, w: 100 },
+                    { x: 1600, y: 360, w: 110 }, { x: 1880, y: 360, w: 120 },
+                    { x: 1750, y: 300, w: 100 }, { x: 2050, y: 400, w: 140 }
+                ],
+                // Section 4: Tower climb (2200-2800)
+                [
+                    { x: 2250, y: 480, w: 100 }, { x: 2380, y: 420, w: 90 },
+                    { x: 2280, y: 360, w: 90 }, { x: 2410, y: 300, w: 90 },
+                    { x: 2320, y: 240, w: 100 }, { x: 2450, y: 180, w: 100 },
+                    { x: 2350, y: 120, w: 100 }, { x: 2480, y: 60, w: 120 },
+                    { x: 2650, y: 140, w: 100 }, { x: 2720, y: 240, w: 110 }
+                ],
+                // Section 5: Long jumps (2800-3500)
+                [
+                    { x: 2900, y: 420, w: 90 }, { x: 3080, y: 380, w: 80 },
+                    { x: 3250, y: 360, w: 90 }, { x: 3100, y: 280, w: 100 },
+                    { x: 3400, y: 480, w: 90 }
+                ],
+                // Section 6: High peaks (3500-4200)
+                [
+                    { x: 3600, y: 480, w: 120 }, { x: 3780, y: 420, w: 100 },
+                    { x: 3950, y: 360, w: 110 }, { x: 3800, y: 280, w: 100 },
+                    { x: 4000, y: 220, w: 100 }, { x: 3850, y: 160, w: 110 },
+                    { x: 4050, y: 100, w: 100 }, { x: 4200, y: 200, w: 120 }
+                ],
+                // Section 7: Cave section (4200-4900)
+                [
+                    { x: 4350, y: 320, w: 100 }, { x: 4520, y: 380, w: 120 },
+                    { x: 4400, y: 460, w: 90 }, { x: 4700, y: 440, w: 100 },
+                    { x: 4600, y: 360, w: 80 }, { x: 4820, y: 300, w: 100 }
+                ],
+                // Section 8: Multi-layer (4900-5600)
+                [
+                    { x: 5000, y: 480, w: 100 }, { x: 5150, y: 420, w: 90 },
+                    { x: 5300, y: 360, w: 100 }, { x: 5180, y: 300, w: 90 },
+                    { x: 5350, y: 240, w: 100 }, { x: 5500, y: 320, w: 110 },
+                    { x: 5400, y: 180, w: 90 }
+                ],
+                // Section 9: Final descent (5600-6400)
+                [
+                    { x: 5680, y: 480, w: 100 }, { x: 5820, y: 420, w: 110 },
+                    { x: 5980, y: 360, w: 100 }, { x: 5850, y: 280, w: 110 },
+                    { x: 6020, y: 220, w: 100 }, { x: 6150, y: 300, w: 120 },
+                    { x: 6300, y: 400, w: 100 }
+                ]
+            ],
+            npcPositions: [
+                { x: 120, y: 410 }, { x: 300, y: 350 }, { x: 640, y: 410 },
+                { x: 870, y: 410 }, { x: 1170, y: 310 }, { x: 1320, y: 350 },
+                { x: 1570, y: 410 }, { x: 1900, y: 290 }, { x: 2070, y: 330 },
+                { x: 2270, y: 410 }, { x: 2370, y: 50 }, { x: 2740, y: 170 },
+                { x: 2920, y: 350 }, { x: 3120, y: 210 }, { x: 3420, y: 410 },
+                { x: 3620, y: 410 }, { x: 4070, y: 30 }, { x: 4220, y: 130 },
+                { x: 4540, y: 310 }, { x: 4720, y: 370 }, { x: 4840, y: 230 },
+                { x: 5020, y: 410 }, { x: 5320, y: 290 }, { x: 5520, y: 250 },
+                { x: 5700, y: 410 }, { x: 6040, y: 150 }, { x: 6320, y: 330 }
+            ]
+        };
+
+        // ===== GAME INITIALIZATION =====
         function init() {
-            // Create platforms for the platformer level - Extended complex level
-            // Ground sections (with strategic gaps)
-            game.platforms.push(new Platform(0, 550, 500, 50, '#2d5016'));
-            game.platforms.push(new Platform(700, 550, 600, 50, '#2d5016'));
-            game.platforms.push(new Platform(1500, 550, 500, 50, '#2d5016'));
-            game.platforms.push(new Platform(2200, 550, 600, 50, '#2d5016'));
-            game.platforms.push(new Platform(3000, 550, 500, 50, '#2d5016'));
-            game.platforms.push(new Platform(3700, 550, 600, 50, '#2d5016'));
-            game.platforms.push(new Platform(4500, 550, 500, 50, '#2d5016'));
-            game.platforms.push(new Platform(5200, 550, 600, 50, '#2d5016'));
-            game.platforms.push(new Platform(6000, 550, 400, 50, '#2d5016'));
+            // Create ground platforms
+            LEVEL_DATA.groundPlatforms.forEach(p => {
+                game.platforms.push(new Platform(p.x, p.y, p.w, 50, CONFIG.colors.ground));
+            });
 
-            // Section 1: Tutorial area (0-800)
-            game.platforms.push(new Platform(100, 480, 120, 15, '#8B4513'));
-            game.platforms.push(new Platform(280, 420, 100, 15, '#8B4513'));
-            game.platforms.push(new Platform(450, 360, 120, 15, '#8B4513'));
-            game.platforms.push(new Platform(620, 480, 80, 15, '#8B4513'));
+            // Create section platforms
+            LEVEL_DATA.sections.forEach(section => {
+                section.forEach(p => {
+                    game.platforms.push(new Platform(p.x, p.y, p.w, 15));
+                });
+            });
 
-            // Section 2: Stepping stones (800-1500)
-            game.platforms.push(new Platform(850, 480, 90, 15, '#8B4513'));
-            game.platforms.push(new Platform(1000, 420, 80, 15, '#8B4513'));
-            game.platforms.push(new Platform(1150, 380, 90, 15, '#8B4513'));
-            game.platforms.push(new Platform(1300, 420, 100, 15, '#8B4513'));
-
-            // Section 3: Mid-level maze (1500-2200)
-            game.platforms.push(new Platform(1550, 480, 120, 15, '#8B4513'));
-            game.platforms.push(new Platform(1730, 420, 100, 15, '#8B4513'));
-            game.platforms.push(new Platform(1600, 360, 110, 15, '#8B4513'));
-            game.platforms.push(new Platform(1880, 360, 120, 15, '#8B4513'));
-            game.platforms.push(new Platform(1750, 300, 100, 15, '#8B4513'));
-            game.platforms.push(new Platform(2050, 400, 140, 15, '#8B4513'));
-
-            // Section 4: Tower climb (2200-2800)
-            game.platforms.push(new Platform(2250, 480, 100, 15, '#8B4513'));
-            game.platforms.push(new Platform(2380, 420, 90, 15, '#8B4513'));
-            game.platforms.push(new Platform(2280, 360, 90, 15, '#8B4513'));
-            game.platforms.push(new Platform(2410, 300, 90, 15, '#8B4513'));
-            game.platforms.push(new Platform(2320, 240, 100, 15, '#8B4513'));
-            game.platforms.push(new Platform(2450, 180, 100, 15, '#8B4513'));
-            game.platforms.push(new Platform(2350, 120, 100, 15, '#8B4513'));
-            game.platforms.push(new Platform(2480, 60, 120, 15, '#8B4513'));
-            game.platforms.push(new Platform(2650, 140, 100, 15, '#8B4513'));
-            game.platforms.push(new Platform(2720, 240, 110, 15, '#8B4513'));
-
-            // Section 5: Long jump challenge (2800-3500)
-            game.platforms.push(new Platform(2900, 420, 90, 15, '#8B4513'));
-            game.platforms.push(new Platform(3080, 380, 80, 15, '#8B4513'));
-            game.platforms.push(new Platform(3250, 360, 90, 15, '#8B4513'));
-            game.platforms.push(new Platform(3100, 280, 100, 15, '#8B4513'));
-            game.platforms.push(new Platform(3400, 480, 90, 15, '#8B4513'));
-
-            // Section 6: High peaks (3500-4200)
-            game.platforms.push(new Platform(3600, 480, 120, 15, '#8B4513'));
-            game.platforms.push(new Platform(3780, 420, 100, 15, '#8B4513'));
-            game.platforms.push(new Platform(3950, 360, 110, 15, '#8B4513'));
-            game.platforms.push(new Platform(3800, 280, 100, 15, '#8B4513'));
-            game.platforms.push(new Platform(4000, 220, 100, 15, '#8B4513'));
-            game.platforms.push(new Platform(3850, 160, 110, 15, '#8B4513'));
-            game.platforms.push(new Platform(4050, 100, 100, 15, '#8B4513'));
-            game.platforms.push(new Platform(4200, 200, 120, 15, '#8B4513'));
-
-            // Section 7: Cave-like section (4200-4900)
-            game.platforms.push(new Platform(4350, 320, 100, 15, '#8B4513'));
-            game.platforms.push(new Platform(4520, 380, 120, 15, '#8B4513'));
-            game.platforms.push(new Platform(4400, 460, 90, 15, '#8B4513'));
-            game.platforms.push(new Platform(4700, 440, 100, 15, '#8B4513'));
-            game.platforms.push(new Platform(4600, 360, 80, 15, '#8B4513'));
-            game.platforms.push(new Platform(4820, 300, 100, 15, '#8B4513'));
-
-            // Section 8: Multi-layer platforming (4900-5600)
-            game.platforms.push(new Platform(5000, 480, 100, 15, '#8B4513'));
-            game.platforms.push(new Platform(5150, 420, 90, 15, '#8B4513'));
-            game.platforms.push(new Platform(5300, 360, 100, 15, '#8B4513'));
-            game.platforms.push(new Platform(5180, 300, 90, 15, '#8B4513'));
-            game.platforms.push(new Platform(5350, 240, 100, 15, '#8B4513'));
-            game.platforms.push(new Platform(5500, 320, 110, 15, '#8B4513'));
-            game.platforms.push(new Platform(5400, 180, 90, 15, '#8B4513'));
-
-            // Section 9: Final descent (5600-6400)
-            game.platforms.push(new Platform(5680, 480, 100, 15, '#8B4513'));
-            game.platforms.push(new Platform(5820, 420, 110, 15, '#8B4513'));
-            game.platforms.push(new Platform(5980, 360, 100, 15, '#8B4513'));
-            game.platforms.push(new Platform(5850, 280, 110, 15, '#8B4513'));
-            game.platforms.push(new Platform(6020, 220, 100, 15, '#8B4513'));
-            game.platforms.push(new Platform(6150, 300, 120, 15, '#8B4513'));
-            game.platforms.push(new Platform(6300, 400, 100, 15, '#8B4513'));
-
-            // Create player at start
-            game.player = new Character('player.png', 100, 480, true);
+            // Create player
+            game.player = new Character('player.png', CONFIG.player.startX, CONFIG.player.startY, true);
             game.characters.push(game.player);
 
-            // Create NPCs with different sprites throughout the extended level
-            const npcSprites = [
-                'npc1.png', 'npc2.png', 'sprite.png', 'sprite2.png',
-                'sprite3.png', 'sprite4.png', 'sprite5.png', 'dinggusen.png',
-                'gressgusen.png', 'lanternegusen.png', 'lunagusen.png',
-                'spaghettigusen.png', 'wirelessgusen.png', 'generatorgusen.png'
-            ];
-
-            // Place NPCs throughout the extended level
-            const npcPositions = [
-                { x: 120, y: 410 }, { x: 300, y: 350 }, { x: 640, y: 410 },     // Section 1
-                { x: 870, y: 410 }, { x: 1170, y: 310 }, { x: 1320, y: 350 },   // Section 2
-                { x: 1570, y: 410 }, { x: 1900, y: 290 }, { x: 2070, y: 330 },  // Section 3
-                { x: 2270, y: 410 }, { x: 2370, y: 50 }, { x: 2740, y: 170 },   // Section 4
-                { x: 2920, y: 350 }, { x: 3120, y: 210 }, { x: 3420, y: 410 },  // Section 5
-                { x: 3620, y: 410 }, { x: 4070, y: 30 }, { x: 4220, y: 130 },   // Section 6
-                { x: 4540, y: 310 }, { x: 4720, y: 370 }, { x: 4840, y: 230 },  // Section 7
-                { x: 5020, y: 410 }, { x: 5320, y: 290 }, { x: 5520, y: 250 },  // Section 8
-                { x: 5700, y: 410 }, { x: 6040, y: 150 }, { x: 6320, y: 330 },  // Section 9
-            ];
-
-            for (let i = 0; i < Math.min(npcPositions.length, npcSprites.length * 2); i++) {
-                const sprite = npcSprites[i % npcSprites.length];
-                const pos = npcPositions[i];
+            // Create NPCs
+            LEVEL_DATA.npcPositions.forEach((pos, i) => {
+                const sprite = CONFIG.npcSprites[i % CONFIG.npcSprites.length];
                 game.characters.push(new Character(sprite, pos.x, pos.y, false));
-            }
+            });
 
-            console.log(`Platformer initialized with ${game.characters.length} characters and ${game.platforms.length} platforms`);
-            console.log(`World size: ${game.worldWidth}x${game.worldHeight}`);
-            console.log(`Loading ${game.totalAssets} assets...`);
+            console.log(`Game initialized: ${game.characters.length} characters, ${game.platforms.length} platforms`);
         }
 
-        // Player death and respawn
+        // ===== DEATH SYSTEM =====
         function killPlayer() {
             if (game.invincibilityTimer > 0 || game.isDead) return;
-
             game.lives--;
             game.isDead = true;
-            game.respawnTimer = 120; // 2 seconds at 60fps
-
-            // Flash effect
-            if (game.lives > 0) {
-                console.log(`Player died! Lives remaining: ${game.lives}`);
-            } else {
-                console.log('Game Over!');
-            }
+            game.respawnTimer = CONFIG.player.respawnFrames;
         }
 
         function respawnPlayer() {
-            if (!game.isDead || game.respawnTimer > 0) return;
-
-            if (game.lives > 0) {
-                // Respawn at start
-                game.player.x = 100;
-                game.player.y = 480;
-                game.player.velocityX = 0;
-                game.player.velocityY = 0;
-                game.isDead = false;
-                game.invincibilityTimer = 180; // 3 seconds of invincibility
-                console.log('Respawned with invincibility!');
-            }
+            if (!game.isDead || game.respawnTimer > 0 || game.lives <= 0) return;
+            game.player.x = CONFIG.player.startX;
+            game.player.y = CONFIG.player.startY;
+            game.player.velocityX = 0;
+            game.player.velocityY = 0;
+            game.isDead = false;
+            game.invincibilityTimer = CONFIG.player.invincibilityFrames;
         }
 
-        // Draw forest background elements
+        // ===== RENDERING =====
         function drawForest(cameraX) {
-            const parallaxBg = cameraX * 0.5; // Background elements move slower
-            const parallaxFg = cameraX * 0.8; // Foreground elements move faster
+            const parallaxBg = cameraX * CONFIG.parallax.backgroundTrees;
+            const parallaxFg = cameraX * CONFIG.parallax.foregroundTrees;
 
-            // Background trees (far away, slower parallax)
-            ctx.fillStyle = '#1a4d1a';
+            // Background trees
             for (let i = 0; i < 30; i++) {
                 const x = i * 400 - parallaxBg;
-                const treeHeight = 180 + (i % 3) * 20;
-                if (x > -100 && x < canvas.width + 100) {
-                    // Tree trunk - reaches ground
-                    ctx.fillStyle = '#3d2817';
-                    ctx.fillRect(x, canvas.height - treeHeight, 25, treeHeight);
+                if (x < -100 || x > CONFIG.canvas.width + 100) continue;
 
-                    // Tree canopy
-                    ctx.fillStyle = '#1a4d1a';
-                    ctx.beginPath();
-                    ctx.ellipse(x + 12, canvas.height - treeHeight, 50, 70, 0, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.beginPath();
-                    ctx.ellipse(x + 12, canvas.height - treeHeight - 20, 40, 50, 0, 0, Math.PI * 2);
-                    ctx.fill();
-                }
+                const treeHeight = 180 + (i % 3) * 20;
+                ctx.fillStyle = '#3d2817';
+                ctx.fillRect(x, CONFIG.canvas.height - treeHeight, 25, treeHeight);
+                ctx.fillStyle = CONFIG.colors.backgroundTree;
+                ctx.beginPath();
+                ctx.ellipse(x + 12, CONFIG.canvas.height - treeHeight, 50, 70, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.ellipse(x + 12, CONFIG.canvas.height - treeHeight - 20, 40, 50, 0, 0, Math.PI * 2);
+                ctx.fill();
             }
 
-            // Foreground trees (closer, faster parallax)
+            // Foreground trees
             for (let i = 0; i < 50; i++) {
                 const x = i * 250 - parallaxFg;
-                const treeHeight = 200 + (i % 4) * 25;
-                if (x > -100 && x < canvas.width + 100) {
-                    // Tree trunk - reaches ground
-                    ctx.fillStyle = '#4a3420';
-                    ctx.fillRect(x, canvas.height - treeHeight, 30, treeHeight);
+                if (x < -100 || x > CONFIG.canvas.width + 100) continue;
 
-                    // Tree canopy
-                    ctx.fillStyle = '#2d5a2d';
-                    ctx.beginPath();
-                    ctx.ellipse(x + 15, canvas.height - treeHeight, 60, 80, 0, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.beginPath();
-                    ctx.ellipse(x + 15, canvas.height - treeHeight - 30, 50, 60, 0, 0, Math.PI * 2);
-                    ctx.fill();
-                }
+                const treeHeight = 200 + (i % 4) * 25;
+                ctx.fillStyle = CONFIG.colors.treeTrunk;
+                ctx.fillRect(x, CONFIG.canvas.height - treeHeight, 30, treeHeight);
+                ctx.fillStyle = CONFIG.colors.foregroundTree;
+                ctx.beginPath();
+                ctx.ellipse(x + 15, CONFIG.canvas.height - treeHeight, 60, 80, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.ellipse(x + 15, CONFIG.canvas.height - treeHeight - 30, 50, 60, 0, 0, Math.PI * 2);
+                ctx.fill();
             }
 
-            // Bushes (world position, full camera movement)
-            ctx.fillStyle = '#2d5a2d';
+            // Bushes and foliage (simplified for performance)
+            ctx.fillStyle = CONFIG.colors.bush;
             for (let i = 0; i < 80; i++) {
                 const x = i * 180 - cameraX;
-                const y = canvas.height - 70 - (i % 3) * 10;
-                if (x > -60 && x < canvas.width + 60) {
-                    ctx.beginPath();
-                    ctx.ellipse(x, y, 35, 25, 0, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.beginPath();
-                    ctx.ellipse(x + 20, y - 5, 30, 22, 0, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-            }
-
-            // Grass tufts
-            ctx.fillStyle = '#3d7a3d';
-            for (let i = 0; i < 150; i++) {
-                const x = i * 90 - cameraX;
-                const y = canvas.height - 50;
-                if (x > -30 && x < canvas.width + 30) {
-                    ctx.fillRect(x, y, 3, 15);
-                    ctx.fillRect(x + 4, y + 2, 3, 13);
-                    ctx.fillRect(x + 8, y, 3, 14);
-                }
-            }
-
-            // Flowers (small colored dots)
-            const flowerColors = ['#ffeb3b', '#ff5722', '#e91e63', '#9c27b0', '#ffffff'];
-            for (let i = 0; i < 100; i++) {
-                const x = i * 120 + 30 - cameraX;
-                const y = canvas.height - 60 - (i % 5) * 3;
-                if (x > -10 && x < canvas.width + 10) {
-                    ctx.fillStyle = flowerColors[i % flowerColors.length];
-                    ctx.beginPath();
-                    ctx.arc(x, y, 4, 0, Math.PI * 2);
-                    ctx.fill();
-                    // Stem
-                    ctx.fillStyle = '#3d7a3d';
-                    ctx.fillRect(x - 1, y, 2, 12);
-                }
+                if (x < -60 || x > CONFIG.canvas.width + 60) continue;
+                const y = CONFIG.canvas.height - 70 - (i % 3) * 10;
+                ctx.beginPath();
+                ctx.ellipse(x, y, 35, 25, 0, 0, Math.PI * 2);
+                ctx.fill();
             }
         }
 
-        // Game loop
-        function gameLoop() {
-            // Clear canvas with sky color
-            ctx.fillStyle = '#87ceeb';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        function drawClouds(cloudParallax) {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            const clouds = [
+                { x: 100, y: 80 }, { x: 500, y: 120 }, { x: 1000, y: 90 },
+                { x: 1600, y: 100 }, { x: 2200, y: 85 }, { x: 2800, y: 110 }
+            ];
 
-            // Show loading screen if assets aren't loaded
+            clouds.forEach(cloud => {
+                const x = cloud.x - cloudParallax;
+                if (x < -200 || x > CONFIG.canvas.width + 200) return;
+                ctx.beginPath();
+                ctx.arc(x, cloud.y, 30, 0, Math.PI * 2);
+                ctx.arc(x + 30, cloud.y, 40, 0, Math.PI * 2);
+                ctx.arc(x + 60, cloud.y, 30, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        function drawUI() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(10, 10, 280, 70);
+            ctx.fillStyle = 'white';
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText('Position: ' + Math.floor(game.player.x) + 'px', 20, 30);
+            ctx.fillText('Score: ' + game.score, 20, 50);
+            ctx.fillStyle = game.lives > 0 ? '#ff0000' : '#666666';
+            ctx.fillText('Lives: ' + '♥'.repeat(game.lives), 20, 70);
+
+            // Death/Game Over screen
+            if (game.isDead) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
+                ctx.font = 'bold 48px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillStyle = '#ff0000';
+
+                if (game.lives > 0) {
+                    ctx.fillText('YOU DIED!', CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 - 40);
+                    ctx.font = '24px Arial';
+                    ctx.fillStyle = 'white';
+                    ctx.fillText('Respawning in ' + Math.ceil(game.respawnTimer / 60) + '...', CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 + 20);
+                } else {
+                    ctx.fillText('GAME OVER!', CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 - 40);
+                    ctx.font = '24px Arial';
+                    ctx.fillStyle = 'white';
+                    ctx.fillText('Final Score: ' + game.score, CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 + 20);
+                    ctx.fillText('Refresh to play again', CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 + 60);
+                }
+            }
+
+            // Invincibility bar
+            if (game.invincibilityTimer > 0 && !game.isDead) {
+                ctx.fillStyle = 'rgba(255, 255, 0, 0.3)';
+                ctx.fillRect(0, CONFIG.canvas.height - 10, (game.invincibilityTimer / CONFIG.player.invincibilityFrames) * CONFIG.canvas.width, 10);
+            }
+        }
+
+        // ===== GAME LOOP =====
+        function gameLoop() {
+            ctx.fillStyle = CONFIG.colors.sky;
+            ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
+
+            // Loading screen
             if (!game.gameStarted) {
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
                 ctx.fillStyle = 'white';
                 ctx.font = 'bold 32px Arial';
                 ctx.textAlign = 'center';
-                ctx.fillText('Loading...', canvas.width / 2, canvas.height / 2 - 20);
+                ctx.fillText('Loading...', CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 - 20);
                 ctx.font = '20px Arial';
-                ctx.fillText(`${game.assetsLoaded} / ${game.totalAssets} sprites loaded`, canvas.width / 2, canvas.height / 2 + 20);
+                ctx.fillText(`${game.assetsLoaded} / ${game.totalAssets}`, CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 + 20);
                 requestAnimationFrame(gameLoop);
                 return;
             }
 
-            // Update camera to follow player (centered, with world bounds)
+            // Update camera
             if (game.player) {
-                // Center camera on player
-                game.camera.x = game.player.x - canvas.width / 2 + game.player.width / 2;
-                game.camera.y = game.player.y - canvas.height / 2 + game.player.height / 2;
-
-                // Keep camera within world bounds
-                game.camera.x = Math.max(0, Math.min(game.camera.x, game.worldWidth - canvas.width));
-                game.camera.y = Math.max(0, Math.min(game.camera.y, game.worldHeight - canvas.height));
+                game.camera.x = Math.max(0, Math.min(
+                    game.player.x - CONFIG.canvas.width / 2 + game.player.width / 2,
+                    CONFIG.world.width - CONFIG.canvas.width
+                ));
             }
 
-            // Draw forest background with parallax
+            // Draw background
             drawForest(game.camera.x);
+            drawClouds(game.camera.x * CONFIG.parallax.clouds);
 
-            // Draw parallax clouds (slower movement for depth effect)
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-            const cloudParallax = game.camera.x * 0.3; // Move slower than camera
-
-            ctx.beginPath();
-            ctx.arc(100 - cloudParallax, 80, 30, 0, Math.PI * 2);
-            ctx.arc(130 - cloudParallax, 80, 40, 0, Math.PI * 2);
-            ctx.arc(160 - cloudParallax, 80, 30, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.beginPath();
-            ctx.arc(500 - cloudParallax, 120, 35, 0, Math.PI * 2);
-            ctx.arc(535 - cloudParallax, 120, 45, 0, Math.PI * 2);
-            ctx.arc(575 - cloudParallax, 120, 35, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.beginPath();
-            ctx.arc(1000 - cloudParallax, 90, 32, 0, Math.PI * 2);
-            ctx.arc(1035 - cloudParallax, 90, 42, 0, Math.PI * 2);
-            ctx.arc(1070 - cloudParallax, 90, 32, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.beginPath();
-            ctx.arc(1600 - cloudParallax, 100, 38, 0, Math.PI * 2);
-            ctx.arc(1640 - cloudParallax, 100, 48, 0, Math.PI * 2);
-            ctx.arc(1685 - cloudParallax, 100, 38, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.beginPath();
-            ctx.arc(2200 - cloudParallax, 85, 33, 0, Math.PI * 2);
-            ctx.arc(2235 - cloudParallax, 85, 43, 0, Math.PI * 2);
-            ctx.arc(2270 - cloudParallax, 85, 33, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.beginPath();
-            ctx.arc(2800 - cloudParallax, 110, 36, 0, Math.PI * 2);
-            ctx.arc(2838 - cloudParallax, 110, 46, 0, Math.PI * 2);
-            ctx.arc(2880 - cloudParallax, 110, 36, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Update invincibility and respawn timers
+            // Update timers
             if (game.invincibilityTimer > 0) game.invincibilityTimer--;
             if (game.respawnTimer > 0) {
                 game.respawnTimer--;
@@ -686,86 +679,36 @@
                 respawnPlayer();
             }
 
-            // Update all characters (unless player is dead)
+            // Update game logic
             if (!game.isDead) {
-                game.characters.forEach(char => {
-                    char.update();
-                });
-            }
+                game.characters.forEach(char => char.update());
 
-            // Check death conditions for player
-            if (game.player && !game.isDead) {
-                // Check for falling out of world
-                if (game.player.y > game.worldHeight + 100) {
-                    killPlayer();
-                }
-
-                // Check collisions between player and NPCs (death on contact)
-                game.characters.forEach(char => {
-                    if (!char.isPlayer && char.loaded && game.player.checkCollision(char)) {
-                        if (game.invincibilityTimer === 0) {
-                            killPlayer();
-                        }
+                // Death checks
+                if (game.player) {
+                    if (game.player.y > CONFIG.world.height + 100) {
+                        killPlayer();
                     }
-                });
-            }
 
-            // Draw platforms with camera offset
-            game.platforms.forEach(platform => {
-                platform.draw(game.camera.x, game.camera.y);
-            });
-
-            // Draw all characters with camera offset
-            game.characters.forEach(char => {
-                char.draw(game.camera.x, game.camera.y);
-            });
-
-            // Draw UI (fixed on screen, not affected by camera)
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-            ctx.fillRect(10, 10, 280, 70);
-            ctx.fillStyle = 'white';
-            ctx.font = '16px Arial';
-            ctx.textAlign = 'left';
-            ctx.fillText('Position: ' + Math.floor(game.player ? game.player.x : 0) + 'px', 20, 30);
-            ctx.fillText('Score: ' + game.score, 20, 50);
-
-            // Draw lives
-            ctx.fillStyle = game.lives > 0 ? '#ff0000' : '#666666';
-            ctx.fillText('Lives: ' + '♥'.repeat(game.lives), 20, 70);
-
-            // Draw death message
-            if (game.isDead) {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#ff0000';
-                ctx.font = 'bold 48px Arial';
-                ctx.textAlign = 'center';
-
-                if (game.lives > 0) {
-                    ctx.fillText('YOU DIED!', canvas.width / 2, canvas.height / 2 - 40);
-                    ctx.font = '24px Arial';
-                    ctx.fillStyle = 'white';
-                    ctx.fillText('Respawning in ' + Math.ceil(game.respawnTimer / 60) + '...', canvas.width / 2, canvas.height / 2 + 20);
-                } else {
-                    ctx.fillText('GAME OVER!', canvas.width / 2, canvas.height / 2 - 40);
-                    ctx.font = '24px Arial';
-                    ctx.fillStyle = 'white';
-                    ctx.fillText('Final Score: ' + game.score, canvas.width / 2, canvas.height / 2 + 20);
-                    ctx.fillText('Refresh page to play again', canvas.width / 2, canvas.height / 2 + 60);
+                    if (game.invincibilityTimer === 0) {
+                        game.characters.forEach(char => {
+                            if (!char.isPlayer && char.loaded && game.player.checkCollision(char)) {
+                                killPlayer();
+                            }
+                        });
+                    }
                 }
             }
 
-            // Draw invincibility indicator
-            if (game.invincibilityTimer > 0 && !game.isDead) {
-                ctx.fillStyle = 'rgba(255, 255, 0, 0.3)';
-                ctx.fillRect(0, canvas.height - 10, (game.invincibilityTimer / 180) * canvas.width, 10);
-            }
+            // Render
+            game.platforms.forEach(p => p.draw(game.camera.x, game.camera.y));
+            game.characters.forEach(c => c.draw(game.camera.x, game.camera.y));
+            drawUI();
 
             game.frame++;
             requestAnimationFrame(gameLoop);
         }
 
-        // Event listeners
+        // ===== INPUT HANDLING =====
         window.addEventListener('keydown', (e) => {
             game.keys[e.key] = true;
             if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
@@ -777,7 +720,7 @@
             game.keys[e.key] = false;
         });
 
-        // Start game
+        // ===== START GAME =====
         init();
         gameLoop();
     </script>

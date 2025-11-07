@@ -239,10 +239,17 @@
                     // Draw left cap
                     ctx.drawImage(leftImg, screenX, screenY, tileWidth, this.height);
 
-                    // Draw middle tiles
-                    const middleTiles = Math.floor((this.width - tileWidth * 2) / tileWidth);
-                    for (let i = 0; i < middleTiles; i++) {
-                        ctx.drawImage(middleImg, screenX + tileWidth + i * tileWidth, screenY, tileWidth, this.height);
+                    // Calculate how many middle tiles we need
+                    const middleWidth = this.width - tileWidth * 2;
+                    const numMiddleTiles = Math.ceil(middleWidth / tileWidth);
+
+                    // Draw middle tiles - fill the entire space
+                    for (let i = 0; i < numMiddleTiles; i++) {
+                        const x = screenX + tileWidth + i * tileWidth;
+                        // Last tile might need to be clipped or stretched to fit perfectly
+                        const remainingWidth = screenX + this.width - tileWidth - x;
+                        const drawWidth = Math.min(tileWidth, remainingWidth);
+                        ctx.drawImage(middleImg, 0, 0, drawWidth, middleImg.height, x, screenY, drawWidth, this.height);
                     }
 
                     // Draw right cap

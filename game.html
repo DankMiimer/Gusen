@@ -169,7 +169,12 @@
             // Grass platform sprites
             grassPlatform: {
                 left: 'Left_Grass_Platform.png',
-                middle: 'Middle_Grass_Platform.png',
+                middle: [
+                    'Middle_Grass_Platform.png',
+                    'Middle_Grass_Platform_Var1.png',
+                    'Middle_Grass_Platform_Var2.png',
+                    'Middle_Grass_Platform_Var3.png'
+                ],
                 right: 'Right_Grass_Platform.png',
                 tileWidth: 32  // Width of each tile
             }
@@ -203,7 +208,7 @@
             hasWon: false,
             grassPlatformImages: {
                 left: null,
-                middle: null,
+                middle: [],  // Array for 4 middle tile variations
                 right: null,
                 loaded: false
             }
@@ -233,7 +238,7 @@
                 if (this.useGrassSprite && game.grassPlatformImages.loaded) {
                     const tileWidth = CONFIG.grassPlatform.tileWidth;
                     const leftImg = game.grassPlatformImages.left;
-                    const middleImg = game.grassPlatformImages.middle;
+                    const middleImages = game.grassPlatformImages.middle;
                     const rightImg = game.grassPlatformImages.right;
 
                     // Draw left cap
@@ -243,10 +248,14 @@
                     const middleWidth = this.width - tileWidth * 2;
                     const numMiddleTiles = Math.ceil(middleWidth / tileWidth);
 
-                    // Draw middle tiles - fill the entire space
+                    // Draw middle tiles with variety - randomly select from variations
                     for (let i = 0; i < numMiddleTiles; i++) {
                         const x = screenX + tileWidth + i * tileWidth;
-                        // Last tile might need to be clipped or stretched to fit perfectly
+                        // Use consistent random selection based on platform position and tile index
+                        const randomIndex = Math.floor((this.x + i * 137) % middleImages.length);
+                        const middleImg = middleImages[randomIndex];
+
+                        // Last tile might need to be clipped to fit perfectly
                         const remainingWidth = screenX + this.width - tileWidth - x;
                         const drawWidth = Math.min(tileWidth, remainingWidth);
                         ctx.drawImage(middleImg, 0, 0, drawWidth, middleImg.height, x, screenY, drawWidth, this.height);
@@ -631,8 +640,8 @@
 
         // ===== GAME INITIALIZATION =====
         function init() {
-            // Load grass platform sprites
-            game.totalAssets += 3; // 3 grass platform images
+            // Load grass platform sprites (1 left + 4 middle variations + 1 right = 6 total)
+            game.totalAssets += 6;
 
             game.grassPlatformImages.left = new Image();
             game.grassPlatformImages.left.src = CONFIG.grassPlatform.left;
@@ -646,17 +655,21 @@
                 checkGrassPlatformsLoaded();
             };
 
-            game.grassPlatformImages.middle = new Image();
-            game.grassPlatformImages.middle.src = CONFIG.grassPlatform.middle;
-            game.grassPlatformImages.middle.onload = () => {
-                game.assetsLoaded++;
-                checkGrassPlatformsLoaded();
-            };
-            game.grassPlatformImages.middle.onerror = () => {
-                console.error('Failed to load middle grass platform');
-                game.assetsLoaded++;
-                checkGrassPlatformsLoaded();
-            };
+            // Load all 4 middle tile variations
+            CONFIG.grassPlatform.middle.forEach((src, index) => {
+                const img = new Image();
+                img.src = src;
+                img.onload = () => {
+                    game.assetsLoaded++;
+                    checkGrassPlatformsLoaded();
+                };
+                img.onerror = () => {
+                    console.error(`Failed to load middle grass platform variation ${index}`);
+                    game.assetsLoaded++;
+                    checkGrassPlatformsLoaded();
+                };
+                game.grassPlatformImages.middle.push(img);
+            });
 
             game.grassPlatformImages.right = new Image();
             game.grassPlatformImages.right.src = CONFIG.grassPlatform.right;
@@ -696,13 +709,14 @@
         }
 
         function checkGrassPlatformsLoaded() {
-            const leftLoaded = game.grassPlatformImages.left.complete;
-            const middleLoaded = game.grassPlatformImages.middle.complete;
-            const rightLoaded = game.grassPlatformImages.right.complete;
+            const leftLoaded = game.grassPlatformImages.left && game.grassPlatformImages.left.complete;
+            const allMiddleLoaded = game.grassPlatformImages.middle.length === 4 &&
+                                    game.grassPlatformImages.middle.every(img => img.complete);
+            const rightLoaded = game.grassPlatformImages.right && game.grassPlatformImages.right.complete;
 
-            if (leftLoaded && middleLoaded && rightLoaded) {
+            if (leftLoaded && allMiddleLoaded && rightLoaded) {
                 game.grassPlatformImages.loaded = true;
-                console.log('Grass platform sprites loaded successfully');
+                console.log('Grass platform sprites loaded successfully (1 left + 4 middle variations + 1 right)');
             }
 
             if (game.assetsLoaded === game.totalAssets) {

@@ -133,18 +133,22 @@
                 foregroundTrees: 0.8
             },
 
-            // Colors
+            // Colors - Vibrant pixel art palette
             colors: {
-                sky: '#87ceeb',
-                ground: '#2d5016',
-                platform: '#8B4513',
-                platformBorder: '#654321',
-                backgroundTree: '#1a4d1a',
-                foregroundTree: '#2d5a2d',
-                treeTrunk: '#4a3420',
-                bush: '#2d5a2d',
-                grass: '#3d7a3d',
-                flowers: ['#ffeb3b', '#ff5722', '#e91e63', '#9c27b0', '#ffffff']
+                sky: '#5fcde4',
+                ground: '#229954',
+                platform: '#d35400',
+                platformBorder: '#784212',
+                platformHighlight: '#ff8c42',
+                platformShadow: '#521d0a',
+                backgroundTree: '#148f77',
+                foregroundTree: '#27ae60',
+                treeTrunk: '#6e4c30',
+                treeTrunkShadow: '#3d2817',
+                bush: '#27ae60',
+                bushDark: '#1e8449',
+                grass: '#52be80',
+                flowers: ['#f4d03f', '#ff5733', '#ec7063', '#af7ac5', '#ffffff']
             },
 
             // NPC sprites list
@@ -203,8 +207,21 @@
                     return;
                 }
 
+                // Main platform color
                 ctx.fillStyle = this.color;
                 ctx.fillRect(screenX, screenY, this.width, this.height);
+
+                // Pixel art style - highlight on top/left
+                ctx.fillStyle = CONFIG.colors.platformHighlight;
+                ctx.fillRect(screenX, screenY, this.width, 3); // Top highlight
+                ctx.fillRect(screenX, screenY, 3, this.height); // Left highlight
+
+                // Shadow on bottom/right
+                ctx.fillStyle = CONFIG.colors.platformShadow;
+                ctx.fillRect(screenX, screenY + this.height - 3, this.width, 3); // Bottom shadow
+                ctx.fillRect(screenX + this.width - 3, screenY, 3, this.height); // Right shadow
+
+                // Border
                 ctx.strokeStyle = CONFIG.colors.platformBorder;
                 ctx.lineWidth = 2;
                 ctx.strokeRect(screenX, screenY, this.width, this.height);
@@ -344,6 +361,12 @@
                     this.velocityY = this.jumpPower;
                     this.jumpTimer = Math.floor(Math.random() * 120) + 60;
                 }
+
+                // Respawn NPCs if they fall too far
+                if (this.y > CONFIG.world.height + 100) {
+                    this.y = 100; // Respawn at top
+                    this.velocityY = 0;
+                }
             }
 
             checkPlatformCollision(platform) {
@@ -383,15 +406,20 @@
                     this.height
                 );
 
-                // Player name tag
+                // Player name tag - Pixel art style
                 if (this.isPlayer) {
                     ctx.globalAlpha = 1.0;
-                    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-                    ctx.fillRect(screenX, screenY - 20, this.width, 15);
-                    ctx.fillStyle = game.invincibilityTimer > 0 ? '#ffff00' : 'white';
-                    ctx.font = 'bold 12px Arial';
+                    // Pixel art border
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+                    ctx.fillRect(screenX, screenY - 22, this.width, 18);
+                    ctx.strokeStyle = game.invincibilityTimer > 0 ? '#ffff00' : '#ffffff';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(screenX, screenY - 22, this.width, 18);
+
+                    ctx.fillStyle = game.invincibilityTimer > 0 ? '#ffff00' : '#f4d03f';
+                    ctx.font = 'bold 11px monospace';
                     ctx.textAlign = 'center';
-                    ctx.fillText('PLAYER', screenX + this.width / 2, screenY - 8);
+                    ctx.fillText('PLAYER', screenX + this.width / 2, screenY - 9);
                 }
 
                 ctx.restore();
@@ -536,107 +564,140 @@
             const parallaxBg = cameraX * CONFIG.parallax.backgroundTrees;
             const parallaxFg = cameraX * CONFIG.parallax.foregroundTrees;
 
-            // Background trees
+            // Background trees - blocky pixel art style
             for (let i = 0; i < 30; i++) {
                 const x = i * 400 - parallaxBg;
                 if (x < -100 || x > CONFIG.canvas.width + 100) continue;
 
                 const treeHeight = 180 + (i % 3) * 20;
-                ctx.fillStyle = '#3d2817';
+                // Trunk with pixel art shading
+                ctx.fillStyle = CONFIG.colors.treeTrunk;
                 ctx.fillRect(x, CONFIG.canvas.height - treeHeight, 25, treeHeight);
+                ctx.fillStyle = CONFIG.colors.treeTrunkShadow;
+                ctx.fillRect(x + 20, CONFIG.canvas.height - treeHeight, 5, treeHeight);
+
+                // Blocky canopy layers
                 ctx.fillStyle = CONFIG.colors.backgroundTree;
-                ctx.beginPath();
-                ctx.ellipse(x + 12, CONFIG.canvas.height - treeHeight, 50, 70, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.beginPath();
-                ctx.ellipse(x + 12, CONFIG.canvas.height - treeHeight - 20, 40, 50, 0, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.fillRect(x - 35, CONFIG.canvas.height - treeHeight, 95, 50);
+                ctx.fillRect(x - 25, CONFIG.canvas.height - treeHeight - 30, 75, 40);
+                ctx.fillRect(x - 15, CONFIG.canvas.height - treeHeight - 50, 55, 30);
             }
 
-            // Foreground trees
+            // Foreground trees - blocky pixel art style
             for (let i = 0; i < 50; i++) {
                 const x = i * 250 - parallaxFg;
                 if (x < -100 || x > CONFIG.canvas.width + 100) continue;
 
                 const treeHeight = 200 + (i % 4) * 25;
+                // Trunk with pixel art shading
                 ctx.fillStyle = CONFIG.colors.treeTrunk;
                 ctx.fillRect(x, CONFIG.canvas.height - treeHeight, 30, treeHeight);
+                ctx.fillStyle = CONFIG.colors.treeTrunkShadow;
+                ctx.fillRect(x + 24, CONFIG.canvas.height - treeHeight, 6, treeHeight);
+
+                // Blocky canopy layers
                 ctx.fillStyle = CONFIG.colors.foregroundTree;
-                ctx.beginPath();
-                ctx.ellipse(x + 15, CONFIG.canvas.height - treeHeight, 60, 80, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.beginPath();
-                ctx.ellipse(x + 15, CONFIG.canvas.height - treeHeight - 30, 50, 60, 0, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.fillRect(x - 45, CONFIG.canvas.height - treeHeight, 120, 60);
+                ctx.fillRect(x - 35, CONFIG.canvas.height - treeHeight - 40, 100, 50);
+                ctx.fillRect(x - 20, CONFIG.canvas.height - treeHeight - 70, 70, 40);
             }
 
-            // Bushes and foliage (simplified for performance)
-            ctx.fillStyle = CONFIG.colors.bush;
+            // Bushes and foliage on ground (world coordinates) - blocky pixel art style
             for (let i = 0; i < 80; i++) {
-                const x = i * 180 - cameraX;
+                const worldX = i * 180;
+                const x = worldX - cameraX;
                 if (x < -60 || x > CONFIG.canvas.width + 60) continue;
-                const y = CONFIG.canvas.height - 70 - (i % 3) * 10;
-                ctx.beginPath();
-                ctx.ellipse(x, y, 35, 25, 0, 0, Math.PI * 2);
-                ctx.fill();
+                // Position bushes on ground level (y=550 is ground)
+                const worldY = 540 - (i % 3) * 5; // Slightly vary height
+                const y = worldY;
+
+                // Blocky bush with layers
+                ctx.fillStyle = CONFIG.colors.bush;
+                ctx.fillRect(x - 30, y - 5, 60, 20);
+                ctx.fillRect(x - 20, y - 15, 40, 15);
+
+                // Dark shading
+                ctx.fillStyle = CONFIG.colors.bushDark;
+                ctx.fillRect(x + 20, y - 5, 10, 20);
+                ctx.fillRect(x + 10, y - 15, 10, 15);
             }
         }
 
         function drawClouds(cloudParallax) {
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
             const clouds = [
                 { x: 100, y: 80 }, { x: 500, y: 120 }, { x: 1000, y: 90 },
                 { x: 1600, y: 100 }, { x: 2200, y: 85 }, { x: 2800, y: 110 }
             ];
 
+            // Blocky pixel art clouds
             clouds.forEach(cloud => {
                 const x = cloud.x - cloudParallax;
                 if (x < -200 || x > CONFIG.canvas.width + 200) return;
-                ctx.beginPath();
-                ctx.arc(x, cloud.y, 30, 0, Math.PI * 2);
-                ctx.arc(x + 30, cloud.y, 40, 0, Math.PI * 2);
-                ctx.arc(x + 60, cloud.y, 30, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.fillRect(x, cloud.y, 80, 25);
+                ctx.fillRect(x + 10, cloud.y - 15, 60, 20);
+                ctx.fillRect(x + 20, cloud.y - 25, 40, 15);
             });
         }
 
         function drawUI() {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            // Pixel art style UI box with border
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
             ctx.fillRect(10, 10, 280, 70);
-            ctx.fillStyle = 'white';
-            ctx.font = '16px Arial';
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(10, 10, 280, 70);
+            ctx.strokeStyle = '#888888';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(13, 13, 274, 64);
+
+            ctx.fillStyle = '#f4d03f';
+            ctx.font = 'bold 16px monospace';
             ctx.textAlign = 'left';
             ctx.fillText('Position: ' + Math.floor(game.player.x) + 'px', 20, 30);
             ctx.fillText('Score: ' + game.score, 20, 50);
             ctx.fillStyle = game.lives > 0 ? '#ff0000' : '#666666';
             ctx.fillText('Lives: ' + '♥'.repeat(game.lives), 20, 70);
 
-            // Death/Game Over screen
+            // Death/Game Over screen - Pixel art style
             if (game.isDead) {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
                 ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
-                ctx.font = 'bold 48px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillStyle = '#ff0000';
 
+                ctx.font = 'bold 48px monospace';
+                ctx.textAlign = 'center';
+
+                // Pixel art text shadow effect
+                ctx.fillStyle = '#000000';
+                ctx.fillText(game.lives > 0 ? 'YOU DIED!' : 'GAME OVER!', CONFIG.canvas.width / 2 + 4, CONFIG.canvas.height / 2 - 36);
+                ctx.fillStyle = '#ff0000';
+                ctx.fillText(game.lives > 0 ? 'YOU DIED!' : 'GAME OVER!', CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 - 40);
+
+                ctx.font = 'bold 24px monospace';
                 if (game.lives > 0) {
-                    ctx.fillText('YOU DIED!', CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 - 40);
-                    ctx.font = '24px Arial';
-                    ctx.fillStyle = 'white';
+                    ctx.fillStyle = '#f4d03f';
                     ctx.fillText('Respawning in ' + Math.ceil(game.respawnTimer / 60) + '...', CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 + 20);
                 } else {
-                    ctx.fillText('GAME OVER!', CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 - 40);
-                    ctx.font = '24px Arial';
-                    ctx.fillStyle = 'white';
+                    ctx.fillStyle = '#f4d03f';
                     ctx.fillText('Final Score: ' + game.score, CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 + 20);
+                    ctx.fillStyle = 'white';
                     ctx.fillText('Refresh to play again', CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 + 60);
                 }
             }
 
-            // Invincibility bar
+            // Invincibility bar - Pixel art style
             if (game.invincibilityTimer > 0 && !game.isDead) {
-                ctx.fillStyle = 'rgba(255, 255, 0, 0.3)';
-                ctx.fillRect(0, CONFIG.canvas.height - 10, (game.invincibilityTimer / CONFIG.player.invincibilityFrames) * CONFIG.canvas.width, 10);
+                const barHeight = 12;
+                const progress = (game.invincibilityTimer / CONFIG.player.invincibilityFrames) * CONFIG.canvas.width;
+
+                // Border
+                ctx.strokeStyle = '#ffff00';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(0, CONFIG.canvas.height - barHeight, CONFIG.canvas.width, barHeight);
+
+                // Fill
+                ctx.fillStyle = 'rgba(255, 255, 0, 0.7)';
+                ctx.fillRect(2, CONFIG.canvas.height - barHeight + 2, progress - 4, barHeight - 4);
             }
         }
 
@@ -645,16 +706,35 @@
             ctx.fillStyle = CONFIG.colors.sky;
             ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
 
-            // Loading screen
+            // Loading screen - Pixel art style
             if (!game.gameStarted) {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.95)';
                 ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
-                ctx.fillStyle = 'white';
-                ctx.font = 'bold 32px Arial';
+
+                // Title with shadow
+                ctx.font = 'bold 32px monospace';
                 ctx.textAlign = 'center';
+                ctx.fillStyle = '#000000';
+                ctx.fillText('Loading...', CONFIG.canvas.width / 2 + 3, CONFIG.canvas.height / 2 - 17);
+                ctx.fillStyle = '#f4d03f';
                 ctx.fillText('Loading...', CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 - 20);
-                ctx.font = '20px Arial';
-                ctx.fillText(`${game.assetsLoaded} / ${game.totalAssets}`, CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 + 20);
+
+                // Progress bar
+                const barWidth = 300;
+                const barHeight = 30;
+                const barX = (CONFIG.canvas.width - barWidth) / 2;
+                const barY = CONFIG.canvas.height / 2 + 10;
+                const progress = game.assetsLoaded / game.totalAssets;
+
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(barX, barY, barWidth, barHeight);
+                ctx.fillStyle = '#27ae60';
+                ctx.fillRect(barX + 3, barY + 3, (barWidth - 6) * progress, barHeight - 6);
+
+                ctx.font = 'bold 16px monospace';
+                ctx.fillStyle = 'white';
+                ctx.fillText(`${game.assetsLoaded} / ${game.totalAssets}`, CONFIG.canvas.width / 2, barY + barHeight + 25);
                 requestAnimationFrame(gameLoop);
                 return;
             }

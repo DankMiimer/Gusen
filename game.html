@@ -105,7 +105,7 @@
                 gravity: 0.4,
                 terminalVelocity: 15,
                 playerSpeed: 3,
-                npcSpeed: 1.5,
+                npcSpeed: 0.8,
                 playerJumpPower: -9,
                 npcJumpPower: -8
             },
@@ -115,8 +115,7 @@
                 startX: 100,
                 startY: 480,
                 lives: 3,
-                invincibilityFrames: 180, // 3 seconds at 60fps
-                respawnFrames: 120 // 2 seconds at 60fps
+                invincibilityFrames: 180 // 3 seconds at 60fps
             },
 
             // Goal settings
@@ -189,7 +188,6 @@
             camera: { x: 0, y: 0 },
             lives: CONFIG.player.lives,
             isDead: false,
-            respawnTimer: 0,
             invincibilityTimer: 0,
             assetsLoaded: 0,
             totalAssets: 0,
@@ -265,6 +263,12 @@
                 this.facingRight = true;
                 this.name = imagePath.replace('.png', '');
 
+                // Player-specific properties
+                if (isPlayer) {
+                    this.jumpCount = 0; // For double jump
+                    this.jumpPressed = false; // For preventing held key issues
+                }
+
                 // NPC-specific properties
                 if (!isPlayer) {
                     this.moveDirection = Math.random() > 0.5 ? 1 : -1;
@@ -322,6 +326,9 @@
                             this.y = platform.y - this.height;
                             this.velocityY = 0;
                             this.onGround = true;
+                            if (this.isPlayer) {
+                                this.jumpCount = 0; // Reset double jump
+                            }
                         }
                     }
                 }
@@ -354,9 +361,17 @@
                     this.currentFrame = 1;
                 }
 
-                if ((game.keys['ArrowUp'] || game.keys['w'] || game.keys[' ']) && this.onGround) {
-                    this.velocityY = this.jumpPower;
-                    this.onGround = false;
+                // Double jump mechanic
+                if ((game.keys['ArrowUp'] || game.keys['w'] || game.keys[' ']) && this.jumpCount < 2) {
+                    // Prevent held key from triggering multiple jumps
+                    if (!this.jumpPressed) {
+                        this.velocityY = this.jumpPower;
+                        this.jumpCount++;
+                        this.onGround = false;
+                        this.jumpPressed = true;
+                    }
+                } else if (!game.keys['ArrowUp'] && !game.keys['w'] && !game.keys[' ']) {
+                    this.jumpPressed = false;
                 }
             }
 
@@ -371,11 +386,7 @@
                     this.jumpTimer = Math.floor(Math.random() * 120) + 60;
                 }
 
-                // Respawn NPCs if they fall too far
-                if (this.y > CONFIG.world.height + 100) {
-                    this.y = 100; // Respawn at top
-                    this.velocityY = 0;
-                }
+                // NPCs that fall off the world just keep falling (no respawn)
             }
 
             checkPlatformCollision(platform) {
@@ -557,22 +568,18 @@
             console.log(`Game initialized: ${game.characters.length} characters, ${game.platforms.length} platforms`);
         }
 
-        // ===== DEATH SYSTEM =====
-        function killPlayer() {
+        // ===== DAMAGE SYSTEM =====
+        function damagePlayer() {
             if (game.invincibilityTimer > 0 || game.isDead) return;
             game.lives--;
-            game.isDead = true;
-            game.respawnTimer = CONFIG.player.respawnFrames;
-        }
 
-        function respawnPlayer() {
-            if (!game.isDead || game.respawnTimer > 0 || game.lives <= 0) return;
-            game.player.x = CONFIG.player.startX;
-            game.player.y = CONFIG.player.startY;
-            game.player.velocityX = 0;
-            game.player.velocityY = 0;
-            game.isDead = false;
+            // Give invincibility after taking damage
             game.invincibilityTimer = CONFIG.player.invincibilityFrames;
+
+            // Only trigger death if no lives left
+            if (game.lives <= 0) {
+                game.isDead = true;
+            }
         }
 
         // ===== RENDERING =====
@@ -739,7 +746,7 @@
                 ctx.fillText('Refresh to play again', CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 + 110);
             }
 
-            // Death/Game Over screen - Pixel art style
+            // Game Over screen - Only shows when lives = 0
             if (game.isDead) {
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
                 ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
@@ -749,20 +756,15 @@
 
                 // Pixel art text shadow effect
                 ctx.fillStyle = '#000000';
-                ctx.fillText(game.lives > 0 ? 'YOU DIED!' : 'GAME OVER!', CONFIG.canvas.width / 2 + 4, CONFIG.canvas.height / 2 - 36);
+                ctx.fillText('GAME OVER!', CONFIG.canvas.width / 2 + 4, CONFIG.canvas.height / 2 - 36);
                 ctx.fillStyle = '#ff0000';
-                ctx.fillText(game.lives > 0 ? 'YOU DIED!' : 'GAME OVER!', CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 - 40);
+                ctx.fillText('GAME OVER!', CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 - 40);
 
                 ctx.font = 'bold 24px monospace';
-                if (game.lives > 0) {
-                    ctx.fillStyle = '#f4d03f';
-                    ctx.fillText('Respawning in ' + Math.ceil(game.respawnTimer / 60) + '...', CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 + 20);
-                } else {
-                    ctx.fillStyle = '#f4d03f';
-                    ctx.fillText('Final Score: ' + game.score, CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 + 20);
-                    ctx.fillStyle = 'white';
-                    ctx.fillText('Refresh to play again', CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 + 60);
-                }
+                ctx.fillStyle = '#f4d03f';
+                ctx.fillText('Final Score: ' + game.score, CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 + 20);
+                ctx.fillStyle = 'white';
+                ctx.fillText('Refresh to play again', CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 + 60);
             }
 
             // Invincibility bar - Pixel art style
@@ -833,11 +835,6 @@
 
             // Update timers
             if (game.invincibilityTimer > 0) game.invincibilityTimer--;
-            if (game.respawnTimer > 0) {
-                game.respawnTimer--;
-            } else {
-                respawnPlayer();
-            }
 
             // Update game logic
             if (!game.isDead && !game.hasWon) {
@@ -860,15 +857,23 @@
                         game.score += 1000; // Bonus points for winning
                     }
 
-                    // Death checks
+                    // Damage checks - falling off the world
                     if (game.player.y > CONFIG.world.height + 100) {
-                        killPlayer();
+                        damagePlayer();
+                        // Respawn at last safe position (start)
+                        if (!game.isDead) {
+                            game.player.y = CONFIG.player.startY;
+                            game.player.x = CONFIG.player.startX;
+                            game.player.velocityX = 0;
+                            game.player.velocityY = 0;
+                        }
                     }
 
+                    // Damage checks - enemy collision
                     if (game.invincibilityTimer === 0) {
                         game.characters.forEach(char => {
                             if (!char.isPlayer && char.loaded && game.player.checkCollision(char)) {
-                                killPlayer();
+                                damagePlayer();
                             }
                         });
                     }

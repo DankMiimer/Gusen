@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gusen Platformer Game</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Arial', sans-serif;
+        }
+
+        #gameContainer {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+
+        canvas {
+            border: 3px solid #333;
+            display: block;
+            background: #87ceeb;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            image-rendering: -moz-crisp-edges;
+        }
+
+        #controls {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f0f0f0;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        h1 {
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            margin-bottom: 20px;
+        }
+
+        .info {
+            color: #333;
+            margin: 5px 0;
+        }
+
+        .key {
+            display: inline-block;
+            padding: 5px 10px;
+            background: #667eea;
+            color: white;
+            border-radius: 3px;
+            margin: 0 3px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎮 Gusen Platformer Game 🎮</h1>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <div id="controls">
+            <div class="info">
+                <strong>Controls:</strong>
+                <span class="key">←</span>
+                <span class="key">→</span>
+                to move,
+                <span class="key">↑</span>
+                <span class="key">W</span>
+                <span class="key">Space</span>
+                to jump
+            </div>
+            <div class="info">
+                <strong>Goal:</strong> Jump across platforms and avoid NPCs!
+            </div>
+            <div class="info" id="score">Score: 0</div>
+        </div>
+    </div>
+
+    <script>
+        // ===== CONFIGURATION =====
+        const CONFIG = {
+            // Canvas settings
+            canvas: {
+                width: 800,
+                height: 600
+            },
+
+            // World settings
+            world: {
+                width: 6400,
+                height: 600
+            },
+
+            // Physics settings
+            physics: {
+                gravity: 0.4,
+                terminalVelocity: 15,
+                playerSpeed: 3,
+                npcSpeed: 0.8,
+                playerJumpPower: -9,
+                npcJumpPower: -8
+            },
+
+            // Player settings
+            player: {
+                startX: 100,
+                startY: 480,
+                lives: 3,
+                invincibilityFrames: 180 // 3 seconds at 60fps
+            },
+
+            // Goal settings
+            goal: {
+                x: 6300,
+                y: 470,
+                width: 60,
+                height: 80
+            },
+
+            // Sprite settings
+            sprite: {
+                scale: 4,
+                defaultWidth: 64,
+                defaultHeight: 64
+            },
+
+            // Parallax settings
+            parallax: {
+                clouds: 0.3,
+                backgroundTrees: 0.5,
+                foregroundTrees: 0.8
+            },
+
+            // Colors - Vibrant pixel art palette
+            colors: {
+                sky: '#5fcde4',
+                ground: '#229954',
+                platform: '#d35400',
+                platformBorder: '#784212',
+                platformHighlight: '#ff8c42',
+                platformShadow: '#521d0a',
+                backgroundTree: '#148f77',
+                foregroundTree: '#27ae60',
+                treeTrunk: '#6e4c30',
+                treeTrunkShadow: '#3d2817',
+                bush: '#27ae60',
+                bushDark: '#1e8449',
+                grass: '#52be80',
+                flowers: ['#f4d03f', '#ff5733', '#ec7063', '#af7ac5', '#ffffff']
+            },
+
+            // NPC sprites list
+            npcSprites: [
+                'npc1.png', 'npc2.png', 'sprite.png', 'sprite2.png',
+                'sprite3.png', 'sprite4.png', 'sprite5.png', 'dinggusen.png',
+                'gressgusen.png', 'lanternegusen.png', 'lunagusen.png',
+                'spaghettigusen.png', 'wirelessgusen.png', 'generatorgusen.png'
+            ],
+
+            // Grass platform sprites
+            grassPlatform: {
+                left: 'Left_Grass_Platform.png',
+                middle: 'Middle_Grass_Platform.png',
+                right: 'Right_Grass_Platform.png',
+                tileWidth: 32  // Width of each tile
+            }
+        };
+
+        // ===== INITIALIZATION =====
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Disable image smoothing for crisp pixel art
+        ctx.imageSmoothingEnabled = false;
+        ctx.mozImageSmoothingEnabled = false;
+        ctx.webkitImageSmoothingEnabled = false;
+        ctx.msImageSmoothingEnabled = false;
+
+        // ===== GAME STATE =====
+        const game = {
+            score: 0,
+            frame: 0,
+            keys: {},
+            characters: [],
+            player: null,
+            platforms: [],
+            camera: { x: 0, y: 0 },
+            lives: CONFIG.player.lives,
+            isDead: false,
+            invincibilityTimer: 0,
+            assetsLoaded: 0,
+            totalAssets: 0,
+            gameStarted: false,
+            hasWon: false,
+            grassPlatformImages: {
+                left: null,
+                middle: null,
+                right: null,
+                loaded: false
+            }
+        };
+
+        // ===== PLATFORM CLASS =====
+        class Platform {
+            constructor(x, y, width, height, color = CONFIG.colors.platform, useGrassSprite = false) {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+                this.color = color;
+                this.useGrassSprite = useGrassSprite;
+            }
+
+            draw(cameraX, cameraY) {
+                // Viewport culling - only draw if visible
+                const screenX = this.x - cameraX;
+                const screenY = this.y - cameraY;
+                if (screenX + this.width < 0 || screenX > CONFIG.canvas.width ||
+                    screenY + this.height < 0 || screenY > CONFIG.canvas.height) {
+                    return;
+                }
+
+                // Grass sprite rendering
+                if (this.useGrassSprite && game.grassPlatformImages.loaded) {
+                    const tileWidth = CONFIG.grassPlatform.tileWidth;
+                    const leftImg = game.grassPlatformImages.left;
+                    const middleImg = game.grassPlatformImages.middle;
+                    const rightImg = game.grassPlatformImages.right;
+
+                    // Draw left cap
+                    ctx.drawImage(leftImg, screenX, screenY, tileWidth, this.height);
+
+                    // Draw middle tiles
+                    const middleTiles = Math.floor((this.width - tileWidth * 2) / tileWidth);
+                    for (let i = 0; i < middleTiles; i++) {
+                        ctx.drawImage(middleImg, screenX + tileWidth + i * tileWidth, screenY, tileWidth, this.height);
+                    }
+
+                    // Draw right cap
+                    ctx.drawImage(rightImg, screenX + this.width - tileWidth, screenY, tileWidth, this.height);
+                    return;
+                }
+
+                // Fallback: Original pixel art style rendering
+                ctx.fillStyle = this.color;
+                ctx.fillRect(screenX, screenY, this.width, this.height);
+
+                // Pixel art style - highlight on top/left
+                ctx.fillStyle = CONFIG.colors.platformHighlight;
+                ctx.fillRect(screenX, screenY, this.width, 3); // Top highlight
+                ctx.fillRect(screenX, screenY, 3, this.height); // Left highlight
+
+                // Shadow on bottom/right
+                ctx.fillStyle = CONFIG.colors.platformShadow;
+                ctx.fillRect(screenX, screenY + this.height - 3, this.width, 3); // Bottom shadow
+                ctx.fillRect(screenX + this.width - 3, screenY, 3, this.height); // Right shadow
+
+                // Border
+                ctx.strokeStyle = CONFIG.colors.platformBorder;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(screenX, screenY, this.width, this.height);
+            }
+
+            checkCollision(character) {
+                return character.x < this.x + this.width &&
+                       character.x + character.width > this.x &&
+                       character.y < this.y + this.height &&
+                       character.y + character.height > this.y;
+            }
+        }
+
+        // ===== CHARACTER CLASS =====
+        class Character {
+            constructor(imagePath, x, y, isPlayer = false) {
+                this.x = x;
+                this.y = y;
+                this.scale = CONFIG.sprite.scale;
+                this.width = CONFIG.sprite.defaultWidth;
+                this.height = CONFIG.sprite.defaultHeight;
+                this.velocityX = 0;
+                this.velocityY = 0;
+                this.speed = isPlayer ? CONFIG.physics.playerSpeed : CONFIG.physics.npcSpeed;
+                this.jumpPower = isPlayer ? CONFIG.physics.playerJumpPower : CONFIG.physics.npcJumpPower;
+                this.isPlayer = isPlayer;
+                this.onGround = false;
+                this.image = new Image();
+                this.image.src = imagePath;
+                this.loaded = false;
+                this.currentFrame = 1; // Start facing right
+                this.facingRight = true;
+                this.name = imagePath.replace('.png', '');
+
+                // Player-specific properties
+                if (isPlayer) {
+                    this.jumpCount = 0; // For double jump
+                    this.jumpPressed = false; // For preventing held key issues
+                }
+
+                // NPC-specific properties
+                if (!isPlayer) {
+                    this.moveDirection = Math.random() > 0.5 ? 1 : -1;
+                    this.jumpTimer = Math.floor(Math.random() * 60) + 30;
+                    this.facingRight = this.moveDirection > 0;
+                    this.currentFrame = this.facingRight ? 1 : 0;
+                    this.isIdle = false;
+                    this.idleTimer = 0;
+                    this.idleCycleDuration = 120; // 2 seconds at 60fps
+                }
+
+                game.totalAssets++;
+                this.setupImageHandlers();
+            }
+
+            setupImageHandlers() {
+                this.image.onload = () => {
+                    this.loaded = true;
+                    game.assetsLoaded++;
+                    this.frameHeight = this.image.height / 2;
+                    this.frameWidth = this.image.width;
+                    this.width = this.frameWidth * this.scale;
+                    this.height = this.frameHeight * this.scale;
+
+                    if (game.assetsLoaded === game.totalAssets) {
+                        game.gameStarted = true;
+                        console.log('All assets loaded!');
+                    }
+                };
+
+                this.image.onerror = () => {
+                    console.error(`Failed to load: ${this.name}`);
+                    game.assetsLoaded++;
+                    if (game.assetsLoaded === game.totalAssets) {
+                        game.gameStarted = true;
+                    }
+                };
+            }
+
+            update() {
+                this.velocityY += CONFIG.physics.gravity;
+
+                if (this.isPlayer) {
+                    this.updatePlayer();
+                } else {
+                    this.updateNPC();
+                }
+
+                // Apply velocity
+                this.x += this.velocityX;
+                this.y += this.velocityY;
+
+                // Platform collision (one-way platforms)
+                this.onGround = false;
+                for (let platform of game.platforms) {
+                    if (this.checkPlatformCollision(platform)) {
+                        if (this.velocityY > 0 && this.y + this.height - this.velocityY <= platform.y + 10) {
+                            this.y = platform.y - this.height;
+                            this.velocityY = 0;
+                            this.onGround = true;
+                            if (this.isPlayer) {
+                                this.jumpCount = 0; // Reset double jump
+                            }
+                        }
+                    }
+                }
+
+                // World bounds
+                this.x = Math.max(0, Math.min(this.x, CONFIG.world.width - this.width));
+
+                // Terminal velocity
+                if (this.velocityY > CONFIG.physics.terminalVelocity) {
+                    this.velocityY = CONFIG.physics.terminalVelocity;
+                }
+            }
+
+            updatePlayer() {
+                this.velocityX = 0;
+
+                if (game.keys['ArrowLeft'] || game.keys['a']) {
+                    this.velocityX = -this.speed;
+                    this.facingRight = false;
+                    this.currentFrame = 0;
+                }
+                if (game.keys['ArrowRight'] || game.keys['d']) {
+                    this.velocityX = this.speed;
+                    this.facingRight = true;
+                    this.currentFrame = 1;
+                }
+
+                // Double jump mechanic
+                if ((game.keys['ArrowUp'] || game.keys['w'] || game.keys[' ']) && this.jumpCount < 2) {
+                    // Prevent held key from triggering multiple jumps
+                    if (!this.jumpPressed) {
+                        this.velocityY = this.jumpPower;
+                        this.jumpCount++;
+                        this.onGround = false;
+                        this.jumpPressed = true;
+                    }
+                } else if (!game.keys['ArrowUp'] && !game.keys['w'] && !game.keys[' ']) {
+                    this.jumpPressed = false;
+                }
+            }
+
+            updateNPC() {
+                // Handle idle state
+                if (this.isIdle) {
+                    this.idleTimer++;
+                    this.velocityX = 0; // Don't move during idle
+
+                    // Slow idle animation - switch frames every half of the cycle (1 second each)
+                    const halfCycle = this.idleCycleDuration / 2;
+                    if (this.idleTimer < halfCycle) {
+                        this.currentFrame = 0; // Face left
+                    } else {
+                        this.currentFrame = 1; // Face right
+                    }
+
+                    // Exit idle state after full cycle
+                    if (this.idleTimer >= this.idleCycleDuration) {
+                        this.isIdle = false;
+                        this.idleTimer = 0;
+                        this.moveDirection *= -1; // Turn around after idle
+                    }
+                    return;
+                }
+
+                // Edge detection - check if about to walk off platform
+                if (this.onGround) {
+                    const checkDistance = 30; // Look ahead 30px
+                    const checkX = this.moveDirection > 0 ? this.x + this.width + checkDistance : this.x - checkDistance;
+                    const checkY = this.y + this.height + 10; // Check slightly below feet
+
+                    // Check if there's a platform ahead
+                    let platformAhead = false;
+                    for (let platform of game.platforms) {
+                        if (checkX > platform.x && checkX < platform.x + platform.width &&
+                            checkY > platform.y && checkY < platform.y + platform.height + 20) {
+                            platformAhead = true;
+                            break;
+                        }
+                    }
+
+                    // Enter idle state if no platform ahead or hit world bounds
+                    if (!platformAhead || this.x <= 0 || this.x >= CONFIG.world.width - this.width) {
+                        this.isIdle = true;
+                        this.idleTimer = 0;
+                        return;
+                    }
+                }
+
+                // Normal movement
+                this.velocityX = this.moveDirection * this.speed;
+                this.currentFrame = this.moveDirection > 0 ? 1 : 0;
+                this.facingRight = this.moveDirection > 0;
+
+                this.jumpTimer--;
+                if (this.jumpTimer <= 0 && this.onGround) {
+                    this.velocityY = this.jumpPower;
+                    this.jumpTimer = Math.floor(Math.random() * 120) + 60;
+                }
+
+                // NPCs that fall off the world just keep falling (no respawn)
+            }
+
+            checkPlatformCollision(platform) {
+                return this.x < platform.x + platform.width &&
+                       this.x + this.width > platform.x &&
+                       this.y < platform.y + platform.height &&
+                       this.y + this.height > platform.y;
+            }
+
+            draw(cameraX, cameraY) {
+                if (!this.loaded) return;
+
+                // Viewport culling
+                const screenX = this.x - cameraX;
+                const screenY = this.y - cameraY;
+                if (screenX + this.width < -100 || screenX > CONFIG.canvas.width + 100 ||
+                    screenY + this.height < -100 || screenY > CONFIG.canvas.height + 100) {
+                    return;
+                }
+
+                ctx.save();
+
+                // Invincibility flash
+                if (this.isPlayer && game.invincibilityTimer > 0 && Math.floor(game.invincibilityTimer / 10) % 2 === 0) {
+                    ctx.globalAlpha = 0.5;
+                }
+
+                ctx.drawImage(
+                    this.image,
+                    0,
+                    this.currentFrame * this.frameHeight,
+                    this.frameWidth,
+                    this.frameHeight,
+                    Math.floor(screenX),
+                    Math.floor(screenY),
+                    this.width,
+                    this.height
+                );
+
+                // Player name tag - Pixel art style
+                if (this.isPlayer) {
+                    ctx.globalAlpha = 1.0;
+                    // Pixel art border
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+                    ctx.fillRect(screenX, screenY - 22, this.width, 18);
+                    ctx.strokeStyle = game.invincibilityTimer > 0 ? '#ffff00' : '#ffffff';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(screenX, screenY - 22, this.width, 18);
+
+                    ctx.fillStyle = game.invincibilityTimer > 0 ? '#ffff00' : '#f4d03f';
+                    ctx.font = 'bold 11px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('PLAYER', screenX + this.width / 2, screenY - 9);
+                }
+
+                ctx.restore();
+            }
+
+            checkCollision(other) {
+                return this.x < other.x + other.width &&
+                       this.x + this.width > other.x &&
+                       this.y < other.y + other.height &&
+                       this.y + this.height > other.y;
+            }
+        }
+
+        // ===== LEVEL DATA =====
+        const LEVEL_DATA = {
+            groundPlatforms: [
+                { x: 0, y: 550, w: 500 }, { x: 700, y: 550, w: 600 },
+                { x: 1500, y: 550, w: 500 }, { x: 2200, y: 550, w: 600 },
+                { x: 3000, y: 550, w: 500 }, { x: 3700, y: 550, w: 600 },
+                { x: 4500, y: 550, w: 500 }, { x: 5200, y: 550, w: 600 },
+                { x: 6000, y: 550, w: 400 }
+            ],
+            sections: [
+                // Section 1: Tutorial (0-800)
+                [
+                    { x: 100, y: 480, w: 120 }, { x: 280, y: 420, w: 100 },
+                    { x: 450, y: 360, w: 120 }, { x: 620, y: 480, w: 80 }
+                ],
+                // Section 2: Stepping stones (800-1500)
+                [
+                    { x: 850, y: 480, w: 90 }, { x: 1000, y: 420, w: 80 },
+                    { x: 1150, y: 380, w: 90 }, { x: 1300, y: 420, w: 100 }
+                ],
+                // Section 3: Mid-level maze (1500-2200)
+                [
+                    { x: 1550, y: 480, w: 120 }, { x: 1730, y: 420, w: 100 },
+                    { x: 1600, y: 360, w: 110 }, { x: 1880, y: 360, w: 120 },
+                    { x: 1750, y: 300, w: 100 }, { x: 2050, y: 400, w: 140 }
+                ],
+                // Section 4: Tower climb (2200-2800)
+                [
+                    { x: 2250, y: 480, w: 100 }, { x: 2380, y: 420, w: 90 },
+                    { x: 2280, y: 360, w: 90 }, { x: 2410, y: 300, w: 90 },
+                    { x: 2320, y: 240, w: 100 }, { x: 2450, y: 180, w: 100 },
+                    { x: 2350, y: 120, w: 100 }, { x: 2480, y: 60, w: 120 },
+                    { x: 2650, y: 140, w: 100 }, { x: 2720, y: 240, w: 110 }
+                ],
+                // Section 5: Long jumps (2800-3500)
+                [
+                    { x: 2900, y: 420, w: 90 }, { x: 3080, y: 380, w: 80 },
+                    { x: 3250, y: 360, w: 90 }, { x: 3100, y: 280, w: 100 },
+                    { x: 3400, y: 480, w: 90 }
+                ],
+                // Section 6: High peaks (3500-4200)
+                [
+                    { x: 3600, y: 480, w: 120 }, { x: 3780, y: 420, w: 100 },
+                    { x: 3950, y: 360, w: 110 }, { x: 3800, y: 280, w: 100 },
+                    { x: 4000, y: 220, w: 100 }, { x: 3850, y: 160, w: 110 },
+                    { x: 4050, y: 100, w: 100 }, { x: 4200, y: 200, w: 120 }
+                ],
+                // Section 7: Cave section (4200-4900)
+                [
+                    { x: 4350, y: 320, w: 100 }, { x: 4520, y: 380, w: 120 },
+                    { x: 4400, y: 460, w: 90 }, { x: 4700, y: 440, w: 100 },
+                    { x: 4600, y: 360, w: 80 }, { x: 4820, y: 300, w: 100 }
+                ],
+                // Section 8: Multi-layer (4900-5600)
+                [
+                    { x: 5000, y: 480, w: 100 }, { x: 5150, y: 420, w: 90 },
+                    { x: 5300, y: 360, w: 100 }, { x: 5180, y: 300, w: 90 },
+                    { x: 5350, y: 240, w: 100 }, { x: 5500, y: 320, w: 110 },
+                    { x: 5400, y: 180, w: 90 }
+                ],
+                // Section 9: Final descent (5600-6400)
+                [
+                    { x: 5680, y: 480, w: 100 }, { x: 5820, y: 420, w: 110 },
+                    { x: 5980, y: 360, w: 100 }, { x: 5850, y: 280, w: 110 },
+                    { x: 6020, y: 220, w: 100 }, { x: 6150, y: 300, w: 120 },
+                    { x: 6300, y: 400, w: 100 }
+                ]
+            ],
+            npcPositions: [
+                // Section 1-2: Start area (keep clear for 400px)
+                { x: 600, y: 410 }, { x: 900, y: 410 }, { x: 1250, y: 350 },
+                // Section 3: Mid-level
+                { x: 1700, y: 390 }, { x: 2000, y: 330 },
+                // Section 4: Tower
+                { x: 2350, y: 210 }, { x: 2650, y: 170 },
+                // Section 5: Long jumps
+                { x: 3000, y: 350 }, { x: 3300, y: 310 },
+                // Section 6: High peaks
+                { x: 3750, y: 350 }, { x: 4100, y: 130 },
+                // Section 7: Cave
+                { x: 4450, y: 310 }, { x: 4750, y: 370 },
+                // Section 8: Multi-layer
+                { x: 5100, y: 350 }, { x: 5400, y: 250 },
+                // Section 9: Final (leave last 400px clear for ending)
+                { x: 5750, y: 350 }
+            ]
+        };
+
+        // ===== GAME INITIALIZATION =====
+        function init() {
+            // Load grass platform sprites
+            game.totalAssets += 3; // 3 grass platform images
+
+            game.grassPlatformImages.left = new Image();
+            game.grassPlatformImages.left.src = CONFIG.grassPlatform.left;
+            game.grassPlatformImages.left.onload = () => {
+                game.assetsLoaded++;
+                checkGrassPlatformsLoaded();
+            };
+            game.grassPlatformImages.left.onerror = () => {
+                console.error('Failed to load left grass platform');
+                game.assetsLoaded++;
+                checkGrassPlatformsLoaded();
+            };
+
+            game.grassPlatformImages.middle = new Image();
+            game.grassPlatformImages.middle.src = CONFIG.grassPlatform.middle;
+            game.grassPlatformImages.middle.onload = () => {
+                game.assetsLoaded++;
+                checkGrassPlatformsLoaded();
+            };
+            game.grassPlatformImages.middle.onerror = () => {
+                console.error('Failed to load middle grass platform');
+                game.assetsLoaded++;
+                checkGrassPlatformsLoaded();
+            };
+
+            game.grassPlatformImages.right = new Image();
+            game.grassPlatformImages.right.src = CONFIG.grassPlatform.right;
+            game.grassPlatformImages.right.onload = () => {
+                game.assetsLoaded++;
+                checkGrassPlatformsLoaded();
+            };
+            game.grassPlatformImages.right.onerror = () => {
+                console.error('Failed to load right grass platform');
+                game.assetsLoaded++;
+                checkGrassPlatformsLoaded();
+            };
+
+            // Create ground platforms with grass sprites
+            LEVEL_DATA.groundPlatforms.forEach(p => {
+                game.platforms.push(new Platform(p.x, p.y, p.w, 50, CONFIG.colors.ground, true));
+            });
+
+            // Create section platforms (regular style)
+            LEVEL_DATA.sections.forEach(section => {
+                section.forEach(p => {
+                    game.platforms.push(new Platform(p.x, p.y, p.w, 15));
+                });
+            });
+
+            // Create player
+            game.player = new Character('player.png', CONFIG.player.startX, CONFIG.player.startY, true);
+            game.characters.push(game.player);
+
+            // Create NPCs
+            LEVEL_DATA.npcPositions.forEach((pos, i) => {
+                const sprite = CONFIG.npcSprites[i % CONFIG.npcSprites.length];
+                game.characters.push(new Character(sprite, pos.x, pos.y, false));
+            });
+
+            console.log(`Game initialized: ${game.characters.length} characters, ${game.platforms.length} platforms`);
+        }
+
+        function checkGrassPlatformsLoaded() {
+            const leftLoaded = game.grassPlatformImages.left.complete;
+            const middleLoaded = game.grassPlatformImages.middle.complete;
+            const rightLoaded = game.grassPlatformImages.right.complete;
+
+            if (leftLoaded && middleLoaded && rightLoaded) {
+                game.grassPlatformImages.loaded = true;
+                console.log('Grass platform sprites loaded successfully');
+            }
+
+            if (game.assetsLoaded === game.totalAssets) {
+                game.gameStarted = true;
+                console.log('All assets loaded!');
+            }
+        }
+
+        // ===== DAMAGE SYSTEM =====
+        function damagePlayer() {
+            if (game.invincibilityTimer > 0 || game.isDead) return;
+            game.lives--;
+
+            // Give invincibility after taking damage
+            game.invincibilityTimer = CONFIG.player.invincibilityFrames;
+
+            // Only trigger death if no lives left
+            if (game.lives <= 0) {
+                game.isDead = true;
+            }
+        }
+
+        // ===== RENDERING =====
+        function drawForest(cameraX) {
+            const parallaxBg = cameraX * CONFIG.parallax.backgroundTrees;
+            const parallaxFg = cameraX * CONFIG.parallax.foregroundTrees;
+
+            // Background trees - blocky pixel art style
+            for (let i = 0; i < 30; i++) {
+                const x = i * 400 - parallaxBg;
+                if (x < -100 || x > CONFIG.canvas.width + 100) continue;
+
+                const treeHeight = 180 + (i % 3) * 20;
+                // Trunk with pixel art shading
+                ctx.fillStyle = CONFIG.colors.treeTrunk;
+                ctx.fillRect(x, CONFIG.canvas.height - treeHeight, 25, treeHeight);
+                ctx.fillStyle = CONFIG.colors.treeTrunkShadow;
+                ctx.fillRect(x + 20, CONFIG.canvas.height - treeHeight, 5, treeHeight);
+
+                // Blocky canopy layers
+                ctx.fillStyle = CONFIG.colors.backgroundTree;
+                ctx.fillRect(x - 35, CONFIG.canvas.height - treeHeight, 95, 50);
+                ctx.fillRect(x - 25, CONFIG.canvas.height - treeHeight - 30, 75, 40);
+                ctx.fillRect(x - 15, CONFIG.canvas.height - treeHeight - 50, 55, 30);
+            }
+
+            // Foreground trees - blocky pixel art style
+            for (let i = 0; i < 50; i++) {
+                const x = i * 250 - parallaxFg;
+                if (x < -100 || x > CONFIG.canvas.width + 100) continue;
+
+                const treeHeight = 200 + (i % 4) * 25;
+                // Trunk with pixel art shading
+                ctx.fillStyle = CONFIG.colors.treeTrunk;
+                ctx.fillRect(x, CONFIG.canvas.height - treeHeight, 30, treeHeight);
+                ctx.fillStyle = CONFIG.colors.treeTrunkShadow;
+                ctx.fillRect(x + 24, CONFIG.canvas.height - treeHeight, 6, treeHeight);
+
+                // Blocky canopy layers
+                ctx.fillStyle = CONFIG.colors.foregroundTree;
+                ctx.fillRect(x - 45, CONFIG.canvas.height - treeHeight, 120, 60);
+                ctx.fillRect(x - 35, CONFIG.canvas.height - treeHeight - 40, 100, 50);
+                ctx.fillRect(x - 20, CONFIG.canvas.height - treeHeight - 70, 70, 40);
+            }
+
+            // Bushes only on ground platforms - blocky pixel art style
+            LEVEL_DATA.groundPlatforms.forEach((platform, platformIndex) => {
+                const bushCount = Math.floor(platform.w / 150); // One bush every 150px
+                for (let i = 0; i < bushCount; i++) {
+                    const worldX = platform.x + 50 + i * 150 + (platformIndex % 3) * 20;
+                    const x = worldX - cameraX;
+                    if (x < -60 || x > CONFIG.canvas.width + 60) continue;
+
+                    const worldY = 540; // Ground level
+                    const y = worldY;
+
+                    // Blocky bush with layers
+                    ctx.fillStyle = CONFIG.colors.bush;
+                    ctx.fillRect(x - 30, y - 5, 60, 20);
+                    ctx.fillRect(x - 20, y - 15, 40, 15);
+
+                    // Dark shading
+                    ctx.fillStyle = CONFIG.colors.bushDark;
+                    ctx.fillRect(x + 20, y - 5, 10, 20);
+                    ctx.fillRect(x + 10, y - 15, 10, 15);
+                }
+            });
+        }
+
+        function drawClouds(cloudParallax) {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            const clouds = [
+                { x: 100, y: 80 }, { x: 500, y: 120 }, { x: 1000, y: 90 },
+                { x: 1600, y: 100 }, { x: 2200, y: 85 }, { x: 2800, y: 110 }
+            ];
+
+            // Blocky pixel art clouds
+            clouds.forEach(cloud => {
+                const x = cloud.x - cloudParallax;
+                if (x < -200 || x > CONFIG.canvas.width + 200) return;
+                ctx.fillRect(x, cloud.y, 80, 25);
+                ctx.fillRect(x + 10, cloud.y - 15, 60, 20);
+                ctx.fillRect(x + 20, cloud.y - 25, 40, 15);
+            });
+        }
+
+        function drawGoal(cameraX, cameraY) {
+            const screenX = CONFIG.goal.x - cameraX;
+            const screenY = CONFIG.goal.y - cameraY;
+
+            // Only draw if visible
+            if (screenX + CONFIG.goal.width < -50 || screenX > CONFIG.canvas.width + 50) return;
+
+            // Flag pole
+            ctx.fillStyle = '#666666';
+            ctx.fillRect(screenX + 25, screenY, 8, CONFIG.goal.height);
+            ctx.fillStyle = '#333333';
+            ctx.fillRect(screenX + 30, screenY, 3, CONFIG.goal.height);
+
+            // Flag - animated waving effect
+            const wave = Math.sin(game.frame * 0.1) * 3;
+            ctx.fillStyle = '#f4d03f';
+            ctx.fillRect(screenX + 33, screenY + 10, 35 + wave, 30);
+            ctx.fillRect(screenX + 33, screenY + 15, 40 + wave, 20);
+
+            // Checkered pattern on flag
+            ctx.fillStyle = '#000000';
+            for (let i = 0; i < 3; i++) {
+                for (let j = 0; j < 2; j++) {
+                    if ((i + j) % 2 === 0) {
+                        ctx.fillRect(screenX + 35 + i * 10, screenY + 12 + j * 10, 8, 8);
+                    }
+                }
+            }
+
+            // Goal text
+            ctx.fillStyle = '#f4d03f';
+            ctx.font = 'bold 14px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('GOAL', screenX + 30, screenY + CONFIG.goal.height + 20);
+        }
+
+        function drawUI() {
+            // Pixel art style UI box with border
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+            ctx.fillRect(10, 10, 280, 70);
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(10, 10, 280, 70);
+            ctx.strokeStyle = '#888888';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(13, 13, 274, 64);
+
+            ctx.fillStyle = '#f4d03f';
+            ctx.font = 'bold 16px monospace';
+            ctx.textAlign = 'left';
+            ctx.fillText('Position: ' + Math.floor(game.player.x) + 'px', 20, 30);
+            ctx.fillText('Score: ' + game.score, 20, 50);
+            ctx.fillStyle = game.lives > 0 ? '#ff0000' : '#666666';
+            ctx.fillText('Lives: ' + '♥'.repeat(game.lives), 20, 70);
+
+            // Victory screen - Pixel art style
+            if (game.hasWon) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+                ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
+
+                ctx.font = 'bold 56px monospace';
+                ctx.textAlign = 'center';
+
+                // Pixel art text shadow effect
+                ctx.fillStyle = '#000000';
+                ctx.fillText('VICTORY!', CONFIG.canvas.width / 2 + 4, CONFIG.canvas.height / 2 - 56);
+                ctx.fillStyle = '#f4d03f';
+                ctx.fillText('VICTORY!', CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 - 60);
+
+                ctx.font = 'bold 24px monospace';
+                ctx.fillStyle = '#27ae60';
+                ctx.fillText('You reached the goal!', CONFIG.canvas.width / 2, CONFIG.canvas.height / 2);
+                ctx.fillStyle = 'white';
+                ctx.fillText('Final Score: ' + game.score, CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 + 40);
+                ctx.fillText('Lives Remaining: ' + game.lives, CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 + 70);
+                ctx.fillStyle = '#888888';
+                ctx.font = 'bold 18px monospace';
+                ctx.fillText('Refresh to play again', CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 + 110);
+            }
+
+            // Game Over screen - Only shows when lives = 0
+            if (game.isDead) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+                ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
+
+                ctx.font = 'bold 48px monospace';
+                ctx.textAlign = 'center';
+
+                // Pixel art text shadow effect
+                ctx.fillStyle = '#000000';
+                ctx.fillText('GAME OVER!', CONFIG.canvas.width / 2 + 4, CONFIG.canvas.height / 2 - 36);
+                ctx.fillStyle = '#ff0000';
+                ctx.fillText('GAME OVER!', CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 - 40);
+
+                ctx.font = 'bold 24px monospace';
+                ctx.fillStyle = '#f4d03f';
+                ctx.fillText('Final Score: ' + game.score, CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 + 20);
+                ctx.fillStyle = 'white';
+                ctx.fillText('Refresh to play again', CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 + 60);
+            }
+
+            // Invincibility bar - Pixel art style
+            if (game.invincibilityTimer > 0 && !game.isDead) {
+                const barHeight = 12;
+                const progress = (game.invincibilityTimer / CONFIG.player.invincibilityFrames) * CONFIG.canvas.width;
+
+                // Border
+                ctx.strokeStyle = '#ffff00';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(0, CONFIG.canvas.height - barHeight, CONFIG.canvas.width, barHeight);
+
+                // Fill
+                ctx.fillStyle = 'rgba(255, 255, 0, 0.7)';
+                ctx.fillRect(2, CONFIG.canvas.height - barHeight + 2, progress - 4, barHeight - 4);
+            }
+        }
+
+        // ===== GAME LOOP =====
+        function gameLoop() {
+            ctx.fillStyle = CONFIG.colors.sky;
+            ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
+
+            // Loading screen - Pixel art style
+            if (!game.gameStarted) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.95)';
+                ctx.fillRect(0, 0, CONFIG.canvas.width, CONFIG.canvas.height);
+
+                // Title with shadow
+                ctx.font = 'bold 32px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillStyle = '#000000';
+                ctx.fillText('Loading...', CONFIG.canvas.width / 2 + 3, CONFIG.canvas.height / 2 - 17);
+                ctx.fillStyle = '#f4d03f';
+                ctx.fillText('Loading...', CONFIG.canvas.width / 2, CONFIG.canvas.height / 2 - 20);
+
+                // Progress bar
+                const barWidth = 300;
+                const barHeight = 30;
+                const barX = (CONFIG.canvas.width - barWidth) / 2;
+                const barY = CONFIG.canvas.height / 2 + 10;
+                const progress = game.assetsLoaded / game.totalAssets;
+
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(barX, barY, barWidth, barHeight);
+                ctx.fillStyle = '#27ae60';
+                ctx.fillRect(barX + 3, barY + 3, (barWidth - 6) * progress, barHeight - 6);
+
+                ctx.font = 'bold 16px monospace';
+                ctx.fillStyle = 'white';
+                ctx.fillText(`${game.assetsLoaded} / ${game.totalAssets}`, CONFIG.canvas.width / 2, barY + barHeight + 25);
+                requestAnimationFrame(gameLoop);
+                return;
+            }
+
+            // Update camera
+            if (game.player) {
+                game.camera.x = Math.max(0, Math.min(
+                    game.player.x - CONFIG.canvas.width / 2 + game.player.width / 2,
+                    CONFIG.world.width - CONFIG.canvas.width
+                ));
+            }
+
+            // Draw background
+            drawForest(game.camera.x);
+            drawClouds(game.camera.x * CONFIG.parallax.clouds);
+
+            // Update timers
+            if (game.invincibilityTimer > 0) game.invincibilityTimer--;
+
+            // Update game logic
+            if (!game.isDead && !game.hasWon) {
+                game.characters.forEach(char => char.update());
+
+                // Win detection
+                if (game.player) {
+                    const goalBox = {
+                        x: CONFIG.goal.x,
+                        y: CONFIG.goal.y,
+                        width: CONFIG.goal.width,
+                        height: CONFIG.goal.height
+                    };
+
+                    if (game.player.x < goalBox.x + goalBox.width &&
+                        game.player.x + game.player.width > goalBox.x &&
+                        game.player.y < goalBox.y + goalBox.height &&
+                        game.player.y + game.player.height > goalBox.y) {
+                        game.hasWon = true;
+                        game.score += 1000; // Bonus points for winning
+                    }
+
+                    // Damage checks - falling off the world
+                    if (game.player.y > CONFIG.world.height + 100) {
+                        damagePlayer();
+                        // Respawn at last safe position (start)
+                        if (!game.isDead) {
+                            game.player.y = CONFIG.player.startY;
+                            game.player.x = CONFIG.player.startX;
+                            game.player.velocityX = 0;
+                            game.player.velocityY = 0;
+                        }
+                    }
+
+                    // Damage checks - enemy collision
+                    if (game.invincibilityTimer === 0) {
+                        game.characters.forEach(char => {
+                            if (!char.isPlayer && char.loaded && game.player.checkCollision(char)) {
+                                damagePlayer();
+                            }
+                        });
+                    }
+                }
+            }
+
+            // Render
+            game.platforms.forEach(p => p.draw(game.camera.x, game.camera.y));
+            drawGoal(game.camera.x, game.camera.y);
+            game.characters.forEach(c => c.draw(game.camera.x, game.camera.y));
+            drawUI();
+
+            game.frame++;
+            requestAnimationFrame(gameLoop);
+        }
+
+        // ===== INPUT HANDLING =====
+        window.addEventListener('keydown', (e) => {
+            game.keys[e.key] = true;
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
+                e.preventDefault();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            game.keys[e.key] = false;
+        });
+
+        // ===== START GAME =====
+        init();
+        gameLoop();
+    </script>
+</body>
+</html>

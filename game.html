@@ -82,7 +82,7 @@
                 stomp attack
             </div>
             <div class="info">
-                <strong>Goal:</strong> Collect coins & gems, use power-ups, reach checkpoints, stomp enemies!
+                <strong>Goal:</strong> Collect coins & gems, reach checkpoints, stomp enemies!
             </div>
             <div class="info" id="score">Score: 0</div>
         </div>
@@ -293,15 +293,18 @@
                     const numTiles = Math.ceil(this.width / tileSize);
 
                     for (let i = 0; i < numTiles; i++) {
-                        const tileX = screenX + i * tileSize;
-                        const tileWidth = Math.min(tileSize, screenX + this.width - tileX);
+                        const tileX = Math.floor(screenX + i * tileSize);
+                        const nextTileX = Math.floor(screenX + (i + 1) * tileSize);
+                        const tileWidth = i === numTiles - 1 ?
+                            Math.floor(screenX + this.width) - tileX :
+                            nextTileX - tileX;
 
                         // Deterministic random for consistent pattern
                         const seed = Math.floor(this.x / tileSize) + i;
 
                         // Dark dirt base
                         ctx.fillStyle = '#3a5a2a';
-                        ctx.fillRect(tileX, screenY + 8, tileWidth, this.height - 8);
+                        ctx.fillRect(tileX, Math.floor(screenY + 8), tileWidth, this.height - 8);
 
                         // Grass top layer (varied greens)
                         const grassVariation = seed % 3;
@@ -312,29 +315,29 @@
                         } else {
                             ctx.fillStyle = '#5dca8a';
                         }
-                        ctx.fillRect(tileX, screenY, tileWidth, 8);
+                        ctx.fillRect(tileX, Math.floor(screenY), tileWidth, 8);
 
                         // Grass tufts on top edge
                         ctx.fillStyle = '#6ad897';
                         for (let j = 0; j < 3; j++) {
                             if ((seed + j) % 2 === 0) {
-                                ctx.fillRect(tileX + j * 5 + 1, screenY - 2, 2, 3);
+                                ctx.fillRect(tileX + j * 5 + 1, Math.floor(screenY - 2), 2, 3);
                             }
                         }
 
                         // Moss spots on dirt
                         ctx.fillStyle = '#2d4a1a';
                         if (seed % 5 === 0) {
-                            ctx.fillRect(tileX + 3, screenY + 12, 3, 3);
+                            ctx.fillRect(tileX + 3, Math.floor(screenY + 12), 3, 3);
                         }
                         if (seed % 7 === 0) {
-                            ctx.fillRect(tileX + 10, screenY + 16, 2, 2);
+                            ctx.fillRect(tileX + 10, Math.floor(screenY + 16), 2, 2);
                         }
 
                         // Darker dirt variation
                         if (seed % 4 === 0) {
                             ctx.fillStyle = '#2f4820';
-                            ctx.fillRect(tileX + 5, screenY + 20, 4, 4);
+                            ctx.fillRect(tileX + 5, Math.floor(screenY + 20), 4, 4);
                         }
                     }
                     return;
@@ -826,19 +829,15 @@
             }
 
             updatePlayer() {
-                // Apply power-ups
-                let speedMultiplier = game.powerupTimers.speed > 0 ? CONFIG.powerups.speedMultiplier : 1;
-                let jumpMultiplier = game.powerupTimers.jump > 0 ? CONFIG.powerups.jumpMultiplier : 1;
-
                 this.velocityX = 0;
 
                 if (game.keys['ArrowLeft'] || game.keys['a']) {
-                    this.velocityX = -this.speed * speedMultiplier;
+                    this.velocityX = -this.speed;
                     this.facingRight = false;
                     this.currentFrame = 0;
                 }
                 if (game.keys['ArrowRight'] || game.keys['d']) {
-                    this.velocityX = this.speed * speedMultiplier;
+                    this.velocityX = this.speed;
                     this.facingRight = true;
                     this.currentFrame = 1;
                 }
@@ -849,7 +848,7 @@
                 // Wall jump mechanic
                 if (this.onWall && !this.onGround && this.canWallJump) {
                     if ((game.keys['ArrowUp'] || game.keys['w'] || game.keys[' ']) && !this.jumpPressed) {
-                        this.velocityY = this.jumpPower * jumpMultiplier;
+                        this.velocityY = this.jumpPower;
                         this.velocityX = this.facingRight ? -8 : 8; // Jump away from wall
                         this.jumpPressed = true;
                         this.wallJumpTimer = 10;
@@ -863,7 +862,7 @@
                 else if ((game.keys['ArrowUp'] || game.keys['w'] || game.keys[' ']) && this.jumpCount < 2) {
                     // Prevent held key from triggering multiple jumps
                     if (!this.jumpPressed) {
-                        this.velocityY = this.jumpPower * jumpMultiplier;
+                        this.velocityY = this.jumpPower;
                         this.jumpCount++;
                         this.onGround = false;
                         this.jumpPressed = true;
@@ -1235,53 +1234,6 @@
                 });
             });
 
-            // Add themed moving platforms
-            // Cloud section - horizontal cloud platform
-            const cloud1 = new Platform(1100, 320, 90, 15, null, false, true, 'cloud');
-            game.platforms.push(cloud1);
-
-            // Crystal section - vertical crystal platform
-            const crystal1 = new Platform(1900, 250, 80, 15, null, false, true, 'crystal');
-            crystal1.moveVertical = true;
-            crystal1.range = 100;
-            game.platforms.push(crystal1);
-
-            // Metal tower - horizontal metal platform
-            const metal1 = new Platform(2550, 350, 100, 15, null, false, true, 'metal');
-            metal1.speed = 2;
-            game.platforms.push(metal1);
-
-            // Mixed section - fast wood platform
-            const wood1 = new Platform(3250, 450, 90, 15, null, false, true, 'wood');
-            wood1.speed = 2.5;
-            wood1.range = 180;
-            game.platforms.push(wood1);
-
-            // Sky high - vertical cloud platform
-            const cloud2 = new Platform(4000, 300, 85, 15, null, false, true, 'cloud');
-            cloud2.moveVertical = true;
-            cloud2.range = 120;
-            cloud2.speed = 1.2;
-            game.platforms.push(cloud2);
-
-            // Industrial - horizontal metal platform
-            const metal2 = new Platform(4650, 250, 95, 15, null, false, true, 'metal');
-            metal2.range = 160;
-            game.platforms.push(metal2);
-
-            // Crystal paradise - diagonal (horizontal) crystal
-            const crystal2 = new Platform(5350, 180, 85, 15, null, false, true, 'crystal');
-            crystal2.speed = 1.8;
-            crystal2.range = 140;
-            game.platforms.push(crystal2);
-
-            // Final gauntlet - fast vertical wood
-            const wood2 = new Platform(6000, 450, 90, 15, null, false, true, 'wood');
-            wood2.moveVertical = true;
-            wood2.speed = 2;
-            wood2.range = 150;
-            game.platforms.push(wood2);
-
             // Create player
             game.player = new Character('player.png', CONFIG.player.startX, CONFIG.player.startY, true);
             game.characters.push(game.player);
@@ -1345,14 +1297,6 @@
             game.collectibles.push(new Collectible(6080, 310, 'coin'));
             game.collectibles.push(new Collectible(6260, 230, 'gem')); // Final gem reward
 
-            // Create power-ups - strategically placed over platforms
-            game.powerups.push(new Powerup(895, 400, 'speed')); // Over cloud platform
-            game.powerups.push(new Powerup(2370, 190, 'jump')); // In metal tower
-            game.powerups.push(new Powerup(3295, 280, 'shield')); // Mixed challenge
-            game.powerups.push(new Powerup(4310, 130, 'jump')); // Sky high section
-            game.powerups.push(new Powerup(4630, 330, 'speed')); // Industrial zone
-            game.powerups.push(new Powerup(5400, 310, 'shield')); // Crystal paradise
-
             // Create checkpoints - on ground platforms at major sections
             game.checkpoints.push(new Checkpoint(1450, 470)); // After clouds - on ground
             game.checkpoints.push(new Checkpoint(2950, 470)); // After metal tower - on ground
@@ -1365,13 +1309,6 @@
         // ===== DAMAGE SYSTEM =====
         function damagePlayer() {
             if (game.invincibilityTimer > 0 || game.isDead) return;
-
-            // Shield power-up prevents damage
-            if (game.powerupTimers.shield > 0) {
-                game.powerupTimers.shield = 0; // Use up shield
-                playSound('powerup');
-                return;
-            }
 
             game.lives--;
 
@@ -1547,23 +1484,6 @@
                 ctx.fillText('Time: ' + seconds + 's', 20, 100);
             }
 
-            // Active power-ups
-            let powerupX = 200;
-            if (game.powerupTimers.speed > 0) {
-                ctx.fillStyle = '#3498db';
-                ctx.fillText('⚡ SPEED', powerupX, 28);
-                powerupX += 100;
-            }
-            if (game.powerupTimers.jump > 0) {
-                ctx.fillStyle = '#2ecc71';
-                ctx.fillText('↑ JUMP', powerupX, 28);
-                powerupX += 90;
-            }
-            if (game.powerupTimers.shield > 0) {
-                ctx.fillStyle = '#f39c12';
-                ctx.fillText('🛡 SHIELD', powerupX, 28);
-            }
-
             // Victory screen - Pixel art style
             if (game.hasWon) {
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
@@ -1678,9 +1598,6 @@
 
             // Update timers
             if (game.invincibilityTimer > 0) game.invincibilityTimer--;
-            if (game.powerupTimers.speed > 0) game.powerupTimers.speed--;
-            if (game.powerupTimers.jump > 0) game.powerupTimers.jump--;
-            if (game.powerupTimers.shield > 0) game.powerupTimers.shield--;
 
             // Update game timer
             if (game.timerRunning) {
@@ -1689,19 +1606,11 @@
 
             // Update game logic
             if (!game.isDead && !game.hasWon) {
-                // Update moving platforms
-                game.platforms.forEach(p => {
-                    if (p.moving) p.update();
-                });
-
                 // Update characters
                 game.characters.forEach(char => char.update());
 
                 // Update collectibles
                 game.collectibles.forEach(c => c.update());
-
-                // Update power-ups
-                game.powerups.forEach(p => p.update());
 
                 // Update particles
                 game.particles.forEach(p => p.update());
@@ -1724,19 +1633,6 @@
                                 game.particles.push(new Particle(collectible.x, collectible.y, 'sparkle'));
                             }
                             playSound('collect');
-                        }
-                    });
-
-                    // Power-up collection
-                    game.powerups.forEach(powerup => {
-                        if (powerup.checkCollision(game.player)) {
-                            powerup.collected = true;
-                            game.powerupTimers[powerup.type] = CONFIG.powerups.duration;
-                            playSound('powerup');
-                            // Create particles
-                            for (let i = 0; i < 12; i++) {
-                                game.particles.push(new Particle(powerup.x, powerup.y, 'sparkle'));
-                            }
                         }
                     });
 
@@ -1819,7 +1715,6 @@
             // Render
             game.platforms.forEach(p => p.draw(game.camera.x, game.camera.y));
             game.collectibles.forEach(c => c.draw(game.camera.x, game.camera.y));
-            game.powerups.forEach(p => p.draw(game.camera.x, game.camera.y));
             game.checkpoints.forEach(c => c.draw(game.camera.x, game.camera.y));
             drawGoal(game.camera.x, game.camera.y);
             game.characters.forEach(c => c.draw(game.camera.x, game.camera.y));

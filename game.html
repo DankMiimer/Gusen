@@ -122,7 +122,7 @@
                 x: 0,
                 y: 0
             },
-            worldWidth: 3200,  // Much wider world for sidescrolling
+            worldWidth: 6400,  // Much longer world for extended sidescrolling
             worldHeight: 600
         };
 
@@ -270,31 +270,15 @@
                 // Reset ground status
                 this.onGround = false;
 
-                // Platform collision detection
+                // Platform collision detection (one-way platforms - can jump through from below)
                 for (let platform of game.platforms) {
                     if (this.checkPlatformCollision(platform)) {
-                        // Landing on top of platform
-                        if (this.velocityY > 0 && this.y + this.height - this.velocityY <= platform.y + 5) {
+                        // Only collide when landing on top (coming down from above)
+                        // Allow jumping through from below
+                        if (this.velocityY > 0 && this.y + this.height - this.velocityY <= platform.y + 10) {
                             this.y = platform.y - this.height;
                             this.velocityY = 0;
                             this.onGround = true;
-                        }
-                        // Hitting bottom of platform
-                        else if (this.velocityY < 0 && this.y - this.velocityY >= platform.y + platform.height) {
-                            this.y = platform.y + platform.height;
-                            this.velocityY = 0;
-                        }
-                        // Side collision
-                        else {
-                            if (this.velocityX > 0) {
-                                this.x = platform.x - this.width;
-                            } else if (this.velocityX < 0) {
-                                this.x = platform.x + platform.width;
-                            }
-                            this.velocityX = 0;
-                            if (!this.isPlayer) {
-                                this.moveDirection *= -1;
-                            }
                         }
                     }
                 }
@@ -364,100 +348,120 @@
 
         // Initialize game
         function init() {
-            // Create platforms for the platformer level - Complex sidescrolling level
-            // Ground sections (with gaps for challenge)
-            game.platforms.push(new Platform(0, 550, 400, 50, '#2d5016'));
-            game.platforms.push(new Platform(600, 550, 400, 50, '#2d5016'));
-            game.platforms.push(new Platform(1200, 550, 500, 50, '#2d5016'));
-            game.platforms.push(new Platform(1900, 550, 400, 50, '#2d5016'));
-            game.platforms.push(new Platform(2500, 550, 700, 50, '#2d5016'));
+            // Create platforms for the platformer level - Extended complex level
+            // Ground sections (with strategic gaps)
+            game.platforms.push(new Platform(0, 550, 500, 50, '#2d5016'));
+            game.platforms.push(new Platform(700, 550, 600, 50, '#2d5016'));
+            game.platforms.push(new Platform(1500, 550, 500, 50, '#2d5016'));
+            game.platforms.push(new Platform(2200, 550, 600, 50, '#2d5016'));
+            game.platforms.push(new Platform(3000, 550, 500, 50, '#2d5016'));
+            game.platforms.push(new Platform(3700, 550, 600, 50, '#2d5016'));
+            game.platforms.push(new Platform(4500, 550, 500, 50, '#2d5016'));
+            game.platforms.push(new Platform(5200, 550, 600, 50, '#2d5016'));
+            game.platforms.push(new Platform(6000, 550, 400, 50, '#2d5016'));
 
-            // Starting area - tutorial section
+            // Section 1: Tutorial area (0-800)
             game.platforms.push(new Platform(100, 480, 120, 15, '#8B4513'));
             game.platforms.push(new Platform(280, 420, 100, 15, '#8B4513'));
             game.platforms.push(new Platform(450, 360, 120, 15, '#8B4513'));
+            game.platforms.push(new Platform(620, 480, 80, 15, '#8B4513'));
 
-            // First challenge - stepping stones over pit
-            game.platforms.push(new Platform(420, 480, 80, 15, '#8B4513'));
-            game.platforms.push(new Platform(520, 450, 60, 15, '#8B4513'));
+            // Section 2: Stepping stones (800-1500)
+            game.platforms.push(new Platform(850, 480, 90, 15, '#8B4513'));
+            game.platforms.push(new Platform(1000, 420, 80, 15, '#8B4513'));
+            game.platforms.push(new Platform(1150, 380, 90, 15, '#8B4513'));
+            game.platforms.push(new Platform(1300, 420, 100, 15, '#8B4513'));
 
-            // Mid-level platforms
-            game.platforms.push(new Platform(700, 480, 150, 15, '#8B4513'));
-            game.platforms.push(new Platform(900, 420, 100, 15, '#8B4513'));
-            game.platforms.push(new Platform(1050, 360, 120, 15, '#8B4513'));
-            game.platforms.push(new Platform(800, 300, 100, 15, '#8B4513'));
-            game.platforms.push(new Platform(650, 240, 120, 15, '#8B4513'));
+            // Section 3: Mid-level maze (1500-2200)
+            game.platforms.push(new Platform(1550, 480, 120, 15, '#8B4513'));
+            game.platforms.push(new Platform(1730, 420, 100, 15, '#8B4513'));
+            game.platforms.push(new Platform(1600, 360, 110, 15, '#8B4513'));
+            game.platforms.push(new Platform(1880, 360, 120, 15, '#8B4513'));
+            game.platforms.push(new Platform(1750, 300, 100, 15, '#8B4513'));
+            game.platforms.push(new Platform(2050, 400, 140, 15, '#8B4513'));
 
-            // Tall tower section
-            game.platforms.push(new Platform(1220, 480, 100, 15, '#8B4513'));
-            game.platforms.push(new Platform(1350, 420, 90, 15, '#8B4513'));
-            game.platforms.push(new Platform(1270, 360, 90, 15, '#8B4513'));
-            game.platforms.push(new Platform(1380, 300, 90, 15, '#8B4513'));
-            game.platforms.push(new Platform(1300, 240, 100, 15, '#8B4513'));
-            game.platforms.push(new Platform(1420, 180, 120, 15, '#8B4513'));
-            game.platforms.push(new Platform(1320, 120, 100, 15, '#8B4513'));
+            // Section 4: Tower climb (2200-2800)
+            game.platforms.push(new Platform(2250, 480, 100, 15, '#8B4513'));
+            game.platforms.push(new Platform(2380, 420, 90, 15, '#8B4513'));
+            game.platforms.push(new Platform(2280, 360, 90, 15, '#8B4513'));
+            game.platforms.push(new Platform(2410, 300, 90, 15, '#8B4513'));
+            game.platforms.push(new Platform(2320, 240, 100, 15, '#8B4513'));
+            game.platforms.push(new Platform(2450, 180, 100, 15, '#8B4513'));
+            game.platforms.push(new Platform(2350, 120, 100, 15, '#8B4513'));
+            game.platforms.push(new Platform(2480, 60, 120, 15, '#8B4513'));
+            game.platforms.push(new Platform(2650, 140, 100, 15, '#8B4513'));
+            game.platforms.push(new Platform(2720, 240, 110, 15, '#8B4513'));
 
-            // Long jump section
-            game.platforms.push(new Platform(1580, 380, 80, 15, '#8B4513'));
-            game.platforms.push(new Platform(1750, 350, 80, 15, '#8B4513'));
+            // Section 5: Long jump challenge (2800-3500)
+            game.platforms.push(new Platform(2900, 420, 90, 15, '#8B4513'));
+            game.platforms.push(new Platform(3080, 380, 80, 15, '#8B4513'));
+            game.platforms.push(new Platform(3250, 360, 90, 15, '#8B4513'));
+            game.platforms.push(new Platform(3100, 280, 100, 15, '#8B4513'));
+            game.platforms.push(new Platform(3400, 480, 90, 15, '#8B4513'));
 
-            // High platforms
-            game.platforms.push(new Platform(1920, 450, 140, 15, '#8B4513'));
-            game.platforms.push(new Platform(2100, 380, 100, 15, '#8B4513'));
-            game.platforms.push(new Platform(2250, 320, 120, 15, '#8B4513'));
-            game.platforms.push(new Platform(2100, 250, 100, 15, '#8B4513'));
-            game.platforms.push(new Platform(1950, 200, 120, 15, '#8B4513'));
-            game.platforms.push(new Platform(2100, 140, 100, 15, '#8B4513'));
+            // Section 6: High peaks (3500-4200)
+            game.platforms.push(new Platform(3600, 480, 120, 15, '#8B4513'));
+            game.platforms.push(new Platform(3780, 420, 100, 15, '#8B4513'));
+            game.platforms.push(new Platform(3950, 360, 110, 15, '#8B4513'));
+            game.platforms.push(new Platform(3800, 280, 100, 15, '#8B4513'));
+            game.platforms.push(new Platform(4000, 220, 100, 15, '#8B4513'));
+            game.platforms.push(new Platform(3850, 160, 110, 15, '#8B4513'));
+            game.platforms.push(new Platform(4050, 100, 100, 15, '#8B4513'));
+            game.platforms.push(new Platform(4200, 200, 120, 15, '#8B4513'));
 
-            // Final section - descending platforms
-            game.platforms.push(new Platform(2420, 480, 100, 15, '#8B4513'));
-            game.platforms.push(new Platform(2580, 420, 120, 15, '#8B4513'));
-            game.platforms.push(new Platform(2750, 360, 100, 15, '#8B4513'));
-            game.platforms.push(new Platform(2900, 300, 140, 15, '#8B4513'));
-            game.platforms.push(new Platform(2700, 220, 120, 15, '#8B4513'));
-            game.platforms.push(new Platform(2880, 160, 100, 15, '#8B4513'));
-            game.platforms.push(new Platform(3050, 480, 150, 15, '#8B4513'));
+            // Section 7: Cave-like section (4200-4900)
+            game.platforms.push(new Platform(4350, 320, 100, 15, '#8B4513'));
+            game.platforms.push(new Platform(4520, 380, 120, 15, '#8B4513'));
+            game.platforms.push(new Platform(4400, 460, 90, 15, '#8B4513'));
+            game.platforms.push(new Platform(4700, 440, 100, 15, '#8B4513'));
+            game.platforms.push(new Platform(4600, 360, 80, 15, '#8B4513'));
+            game.platforms.push(new Platform(4820, 300, 100, 15, '#8B4513'));
+
+            // Section 8: Multi-layer platforming (4900-5600)
+            game.platforms.push(new Platform(5000, 480, 100, 15, '#8B4513'));
+            game.platforms.push(new Platform(5150, 420, 90, 15, '#8B4513'));
+            game.platforms.push(new Platform(5300, 360, 100, 15, '#8B4513'));
+            game.platforms.push(new Platform(5180, 300, 90, 15, '#8B4513'));
+            game.platforms.push(new Platform(5350, 240, 100, 15, '#8B4513'));
+            game.platforms.push(new Platform(5500, 320, 110, 15, '#8B4513'));
+            game.platforms.push(new Platform(5400, 180, 90, 15, '#8B4513'));
+
+            // Section 9: Final descent (5600-6400)
+            game.platforms.push(new Platform(5680, 480, 100, 15, '#8B4513'));
+            game.platforms.push(new Platform(5820, 420, 110, 15, '#8B4513'));
+            game.platforms.push(new Platform(5980, 360, 100, 15, '#8B4513'));
+            game.platforms.push(new Platform(5850, 280, 110, 15, '#8B4513'));
+            game.platforms.push(new Platform(6020, 220, 100, 15, '#8B4513'));
+            game.platforms.push(new Platform(6150, 300, 120, 15, '#8B4513'));
+            game.platforms.push(new Platform(6300, 400, 100, 15, '#8B4513'));
 
             // Create player at start
             game.player = new Character('player.png', 100, 480, true);
             game.characters.push(game.player);
 
-            // Create NPCs with different sprites throughout the level
+            // Create NPCs with different sprites throughout the extended level
             const npcSprites = [
-                'npc1.png',
-                'npc2.png',
-                'sprite.png',
-                'sprite2.png',
-                'sprite3.png',
-                'sprite4.png',
-                'sprite5.png',
-                'dinggusen.png',
-                'gressgusen.png',
-                'lanternegusen.png',
-                'lunagusen.png',
-                'spaghettigusen.png',
-                'wirelessgusen.png',
-                'generatorgusen.png'
+                'npc1.png', 'npc2.png', 'sprite.png', 'sprite2.png',
+                'sprite3.png', 'sprite4.png', 'sprite5.png', 'dinggusen.png',
+                'gressgusen.png', 'lanternegusen.png', 'lunagusen.png',
+                'spaghettigusen.png', 'wirelessgusen.png', 'generatorgusen.png'
             ];
 
-            // Place NPCs throughout the level on various platforms
+            // Place NPCs throughout the extended level
             const npcPositions = [
-                { x: 120, y: 410 },   // Starting area
-                { x: 300, y: 350 },   // Early platforms
-                { x: 720, y: 410 },   // Mid section
-                { x: 920, y: 350 },   // Mid platforms
-                { x: 1240, y: 410 },  // Tower section
-                { x: 1330, y: 290 },  // Tower middle
-                { x: 1340, y: 50 },   // Tower top
-                { x: 1600, y: 310 },  // Jump section
-                { x: 2120, y: 310 },  // High section
-                { x: 2270, y: 250 },  // Peak area
-                { x: 2600, y: 350 },  // Final section
-                { x: 3070, y: 410 },  // End area
+                { x: 120, y: 410 }, { x: 300, y: 350 }, { x: 640, y: 410 },     // Section 1
+                { x: 870, y: 410 }, { x: 1170, y: 310 }, { x: 1320, y: 350 },   // Section 2
+                { x: 1570, y: 410 }, { x: 1900, y: 290 }, { x: 2070, y: 330 },  // Section 3
+                { x: 2270, y: 410 }, { x: 2370, y: 50 }, { x: 2740, y: 170 },   // Section 4
+                { x: 2920, y: 350 }, { x: 3120, y: 210 }, { x: 3420, y: 410 },  // Section 5
+                { x: 3620, y: 410 }, { x: 4070, y: 30 }, { x: 4220, y: 130 },   // Section 6
+                { x: 4540, y: 310 }, { x: 4720, y: 370 }, { x: 4840, y: 230 },  // Section 7
+                { x: 5020, y: 410 }, { x: 5320, y: 290 }, { x: 5520, y: 250 },  // Section 8
+                { x: 5700, y: 410 }, { x: 6040, y: 150 }, { x: 6320, y: 330 },  // Section 9
             ];
 
-            for (let i = 0; i < Math.min(npcPositions.length, npcSprites.length); i++) {
-                const sprite = npcSprites[i];
+            for (let i = 0; i < Math.min(npcPositions.length, npcSprites.length * 2); i++) {
+                const sprite = npcSprites[i % npcSprites.length];
                 const pos = npcPositions[i];
                 game.characters.push(new Character(sprite, pos.x, pos.y, false));
             }
@@ -467,9 +471,99 @@
             console.log(`Loading ${game.totalAssets} assets...`);
         }
 
+        // Draw forest background elements
+        function drawForest(cameraX) {
+            const parallaxBg = cameraX * 0.5; // Background elements move slower
+            const parallaxFg = cameraX * 0.8; // Foreground elements move faster
+
+            // Background trees (far away, slower parallax)
+            ctx.fillStyle = '#1a4d1a';
+            for (let i = 0; i < 30; i++) {
+                const x = i * 400 - parallaxBg;
+                const treeHeight = 180 + (i % 3) * 20;
+                if (x > -100 && x < canvas.width + 100) {
+                    // Tree trunk
+                    ctx.fillStyle = '#3d2817';
+                    ctx.fillRect(x, canvas.height - 150 - treeHeight, 25, treeHeight);
+
+                    // Tree canopy
+                    ctx.fillStyle = '#1a4d1a';
+                    ctx.beginPath();
+                    ctx.ellipse(x + 12, canvas.height - 150 - treeHeight, 50, 70, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.ellipse(x + 12, canvas.height - 170 - treeHeight, 40, 50, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            // Foreground trees (closer, faster parallax)
+            for (let i = 0; i < 50; i++) {
+                const x = i * 250 - parallaxFg;
+                const treeHeight = 200 + (i % 4) * 25;
+                if (x > -100 && x < canvas.width + 100) {
+                    // Tree trunk
+                    ctx.fillStyle = '#4a3420';
+                    ctx.fillRect(x, canvas.height - 100 - treeHeight, 30, treeHeight);
+
+                    // Tree canopy
+                    ctx.fillStyle = '#2d5a2d';
+                    ctx.beginPath();
+                    ctx.ellipse(x + 15, canvas.height - 100 - treeHeight, 60, 80, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.ellipse(x + 15, canvas.height - 130 - treeHeight, 50, 60, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            // Bushes (world position, full camera movement)
+            ctx.fillStyle = '#2d5a2d';
+            for (let i = 0; i < 80; i++) {
+                const x = i * 180 - cameraX;
+                const y = canvas.height - 70 - (i % 3) * 10;
+                if (x > -60 && x < canvas.width + 60) {
+                    ctx.beginPath();
+                    ctx.ellipse(x, y, 35, 25, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.ellipse(x + 20, y - 5, 30, 22, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            // Grass tufts
+            ctx.fillStyle = '#3d7a3d';
+            for (let i = 0; i < 150; i++) {
+                const x = i * 90 - cameraX;
+                const y = canvas.height - 50;
+                if (x > -30 && x < canvas.width + 30) {
+                    ctx.fillRect(x, y, 3, 15);
+                    ctx.fillRect(x + 4, y + 2, 3, 13);
+                    ctx.fillRect(x + 8, y, 3, 14);
+                }
+            }
+
+            // Flowers (small colored dots)
+            const flowerColors = ['#ffeb3b', '#ff5722', '#e91e63', '#9c27b0', '#ffffff'];
+            for (let i = 0; i < 100; i++) {
+                const x = i * 120 + 30 - cameraX;
+                const y = canvas.height - 60 - (i % 5) * 3;
+                if (x > -10 && x < canvas.width + 10) {
+                    ctx.fillStyle = flowerColors[i % flowerColors.length];
+                    ctx.beginPath();
+                    ctx.arc(x, y, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                    // Stem
+                    ctx.fillStyle = '#3d7a3d';
+                    ctx.fillRect(x - 1, y, 2, 12);
+                }
+            }
+        }
+
         // Game loop
         function gameLoop() {
-            // Clear canvas
+            // Clear canvas with sky color
             ctx.fillStyle = '#87ceeb';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -497,6 +591,9 @@
                 game.camera.x = Math.max(0, Math.min(game.camera.x, game.worldWidth - canvas.width));
                 game.camera.y = Math.max(0, Math.min(game.camera.y, game.worldHeight - canvas.height));
             }
+
+            // Draw forest background with parallax
+            drawForest(game.camera.x);
 
             // Draw parallax clouds (slower movement for depth effect)
             ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';

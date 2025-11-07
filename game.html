@@ -751,8 +751,10 @@
                     // Sword attack properties
                     this.hasSword = true;
                     this.swordAttacking = false;
-                    this.swordAttackDuration = 20; // frames
+                    this.swordAttackDuration = 20; // frames for swing animation
+                    this.swordCooldown = 90; // frames (1.5 seconds at 60fps)
                     this.swordAttackTimer = 0;
+                    this.swordCooldownTimer = 0;
                     this.swordRange = 80;
                     this.swordWidth = 60;
                     this.swordHeight = 60;
@@ -768,6 +770,7 @@
 
                 // NPC-specific properties
                 if (!isPlayer) {
+                    this.dead = false; // Track if enemy is permanently dead
                     this.enemyType = enemyType; // 'walking', 'flying', 'shooting', 'patrolling'
                     this.moveDirection = Math.random() > 0.5 ? 1 : -1;
                     this.jumpTimer = Math.floor(Math.random() * 60) + 30;
@@ -917,9 +920,10 @@
 
                 // Sword attack - X key
                 if (game.keys['x'] || game.keys['X']) {
-                    if (!this.swordAttacking && this.swordAttackTimer <= 0) {
+                    if (!this.swordAttacking && this.swordCooldownTimer <= 0) {
                         this.swordAttacking = true;
                         this.swordAttackTimer = this.swordAttackDuration;
+                        this.swordCooldownTimer = this.swordCooldown;
                         playSound('collect'); // Sword swing sound
                     }
                 }
@@ -930,6 +934,11 @@
                     if (this.swordAttackTimer <= 0) {
                         this.swordAttacking = false;
                     }
+                }
+
+                // Update sword cooldown timer
+                if (this.swordCooldownTimer > 0) {
+                    this.swordCooldownTimer--;
                 }
 
                 if (this.wallJumpTimer > 0) this.wallJumpTimer--;
@@ -1101,45 +1110,46 @@
                 if (this.isPlayer && this.swordAttacking && this.swordLoaded) {
                     ctx.save();
 
-                    // Determine sword position based on facing direction
-                    const swordOffsetX = this.facingRight ? this.width : -this.swordWidth;
-                    const swordOffsetY = this.height / 2 - this.swordHeight / 2;
-                    const swordX = screenX + swordOffsetX;
-                    const swordY = screenY + swordOffsetY;
+                    // Calculate swing progress (0 = start, 1 = end)
+                    const swingProgress = 1 - (this.swordAttackTimer / this.swordAttackDuration);
+
+                    // Rotation from -90 degrees (raised) to 90 degrees (chopped down)
+                    const startAngle = -Math.PI / 2; // -90 degrees (raised)
+                    const endAngle = Math.PI / 2;    // 90 degrees (down)
+                    const currentAngle = startAngle + (endAngle - startAngle) * swingProgress;
 
                     // Glow effect - frame 1 is glowing version
-                    const glowProgress = this.swordAttackTimer / this.swordAttackDuration;
-                    const swordFrame = glowProgress > 0.5 ? 1 : 0; // Glow in first half of attack
+                    const swordFrame = swingProgress < 0.5 ? 1 : 0; // Glow in first half of attack
 
+                    // Pivot point is at player's shoulder
+                    const pivotOffsetX = this.facingRight ? this.width * 0.8 : this.width * 0.2;
+                    const pivotOffsetY = this.height * 0.3;
+                    const pivotX = screenX + pivotOffsetX;
+                    const pivotY = screenY + pivotOffsetY;
+
+                    // Move to pivot point
+                    ctx.translate(Math.floor(pivotX), Math.floor(pivotY));
+
+                    // Apply rotation and horizontal flip if needed
                     if (this.facingRight) {
-                        // Draw sword normally
-                        ctx.drawImage(
-                            this.swordImage,
-                            0,
-                            swordFrame * this.swordFrameHeight,
-                            this.swordFrameWidth,
-                            this.swordFrameHeight,
-                            Math.floor(swordX),
-                            Math.floor(swordY),
-                            this.swordWidth,
-                            this.swordHeight
-                        );
+                        ctx.rotate(currentAngle);
                     } else {
-                        // Mirror sword for left-facing
-                        ctx.translate(Math.floor(swordX + this.swordWidth / 2), Math.floor(swordY + this.swordHeight / 2));
                         ctx.scale(-1, 1);
-                        ctx.drawImage(
-                            this.swordImage,
-                            0,
-                            swordFrame * this.swordFrameHeight,
-                            this.swordFrameWidth,
-                            this.swordFrameHeight,
-                            -this.swordWidth / 2,
-                            -this.swordHeight / 2,
-                            this.swordWidth,
-                            this.swordHeight
-                        );
+                        ctx.rotate(-currentAngle);
                     }
+
+                    // Draw sword at origin (pivot point)
+                    ctx.drawImage(
+                        this.swordImage,
+                        0,
+                        swordFrame * this.swordFrameHeight,
+                        this.swordFrameWidth,
+                        this.swordFrameHeight,
+                        -this.swordWidth / 2,
+                        -10, // Offset so handle is at pivot
+                        this.swordWidth,
+                        this.swordHeight
+                    );
 
                     ctx.restore();
                 }
@@ -1775,8 +1785,12 @@
 
             // Update game logic
             if (!game.isDead && !game.hasWon) {
-                // Update characters
-                game.characters.forEach(char => char.update());
+                // Update characters (skip dead enemies)
+                game.characters.forEach(char => {
+                    if (char.isPlayer || !char.dead) {
+                        char.update();
+                    }
+                });
 
                 // Update collectibles
                 game.collectibles.forEach(c => c.update());
@@ -1861,14 +1875,14 @@
                     const swordHitbox = game.player.getSwordHitbox();
                     if (swordHitbox) {
                         game.characters.forEach(char => {
-                            if (!char.isPlayer && char.loaded && char.y > -500) { // Don't hit already defeated enemies
+                            if (!char.isPlayer && char.loaded && !char.dead) { // Don't hit already dead enemies
                                 // Check if sword hitbox overlaps with enemy
                                 if (swordHitbox.x < char.x + char.width &&
                                     swordHitbox.x + swordHitbox.width > char.x &&
                                     swordHitbox.y < char.y + char.height &&
                                     swordHitbox.y + swordHitbox.height > char.y) {
                                     // Hit enemy with sword
-                                    char.y = -1000; // Move off screen
+                                    char.dead = true; // Mark as permanently dead
                                     game.score += 75; // More points for sword kill
 
                                     // Create blood splatter particles
@@ -1884,11 +1898,11 @@
                     // Enemy collision / stomp attack
                     if (game.invincibilityTimer === 0) {
                         game.characters.forEach(char => {
-                            if (!char.isPlayer && char.loaded && char.y > -500 && game.player.checkCollision(char)) {
+                            if (!char.isPlayer && char.loaded && !char.dead && game.player.checkCollision(char)) {
                                 // Stomp attack - if player is above enemy and falling
                                 if (game.player.isStomping && game.player.y + game.player.height / 2 < char.y) {
                                     // Remove enemy
-                                    char.y = -1000; // Move off screen
+                                    char.dead = true; // Mark as permanently dead
                                     game.score += 50;
                                     game.player.velocityY = game.player.stompVelocity; // Bounce
                                     // Create particles
@@ -1910,7 +1924,12 @@
             game.collectibles.forEach(c => c.draw(game.camera.x, game.camera.y));
             game.checkpoints.forEach(c => c.draw(game.camera.x, game.camera.y));
             drawGoal(game.camera.x, game.camera.y);
-            game.characters.forEach(c => c.draw(game.camera.x, game.camera.y));
+            // Render characters (skip dead enemies)
+            game.characters.forEach(c => {
+                if (c.isPlayer || !c.dead) {
+                    c.draw(game.camera.x, game.camera.y);
+                }
+            });
             game.particles.forEach(p => p.draw(game.camera.x, game.camera.y));
             drawUI();
 

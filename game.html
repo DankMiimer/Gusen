@@ -164,7 +164,15 @@
                 'sprite3.png', 'sprite4.png', 'sprite5.png', 'dinggusen.png',
                 'gressgusen.png', 'lanternegusen.png', 'lunagusen.png',
                 'spaghettigusen.png', 'wirelessgusen.png', 'generatorgusen.png'
-            ]
+            ],
+
+            // Grass platform sprites
+            grassPlatform: {
+                left: 'Left_Grass_Platform.png',
+                middle: 'Middle_Grass_Platform.png',
+                right: 'Right_Grass_Platform.png',
+                tileWidth: 32  // Width of each tile
+            }
         };
 
         // ===== INITIALIZATION =====
@@ -192,17 +200,24 @@
             assetsLoaded: 0,
             totalAssets: 0,
             gameStarted: false,
-            hasWon: false
+            hasWon: false,
+            grassPlatformImages: {
+                left: null,
+                middle: null,
+                right: null,
+                loaded: false
+            }
         };
 
         // ===== PLATFORM CLASS =====
         class Platform {
-            constructor(x, y, width, height, color = CONFIG.colors.platform) {
+            constructor(x, y, width, height, color = CONFIG.colors.platform, useGrassSprite = false) {
                 this.x = x;
                 this.y = y;
                 this.width = width;
                 this.height = height;
                 this.color = color;
+                this.useGrassSprite = useGrassSprite;
             }
 
             draw(cameraX, cameraY) {
@@ -214,7 +229,28 @@
                     return;
                 }
 
-                // Main platform color
+                // Grass sprite rendering
+                if (this.useGrassSprite && game.grassPlatformImages.loaded) {
+                    const tileWidth = CONFIG.grassPlatform.tileWidth;
+                    const leftImg = game.grassPlatformImages.left;
+                    const middleImg = game.grassPlatformImages.middle;
+                    const rightImg = game.grassPlatformImages.right;
+
+                    // Draw left cap
+                    ctx.drawImage(leftImg, screenX, screenY, tileWidth, this.height);
+
+                    // Draw middle tiles
+                    const middleTiles = Math.floor((this.width - tileWidth * 2) / tileWidth);
+                    for (let i = 0; i < middleTiles; i++) {
+                        ctx.drawImage(middleImg, screenX + tileWidth + i * tileWidth, screenY, tileWidth, this.height);
+                    }
+
+                    // Draw right cap
+                    ctx.drawImage(rightImg, screenX + this.width - tileWidth, screenY, tileWidth, this.height);
+                    return;
+                }
+
+                // Fallback: Original pixel art style rendering
                 ctx.fillStyle = this.color;
                 ctx.fillRect(screenX, screenY, this.width, this.height);
 
@@ -588,12 +624,51 @@
 
         // ===== GAME INITIALIZATION =====
         function init() {
-            // Create ground platforms
+            // Load grass platform sprites
+            game.totalAssets += 3; // 3 grass platform images
+
+            game.grassPlatformImages.left = new Image();
+            game.grassPlatformImages.left.src = CONFIG.grassPlatform.left;
+            game.grassPlatformImages.left.onload = () => {
+                game.assetsLoaded++;
+                checkGrassPlatformsLoaded();
+            };
+            game.grassPlatformImages.left.onerror = () => {
+                console.error('Failed to load left grass platform');
+                game.assetsLoaded++;
+                checkGrassPlatformsLoaded();
+            };
+
+            game.grassPlatformImages.middle = new Image();
+            game.grassPlatformImages.middle.src = CONFIG.grassPlatform.middle;
+            game.grassPlatformImages.middle.onload = () => {
+                game.assetsLoaded++;
+                checkGrassPlatformsLoaded();
+            };
+            game.grassPlatformImages.middle.onerror = () => {
+                console.error('Failed to load middle grass platform');
+                game.assetsLoaded++;
+                checkGrassPlatformsLoaded();
+            };
+
+            game.grassPlatformImages.right = new Image();
+            game.grassPlatformImages.right.src = CONFIG.grassPlatform.right;
+            game.grassPlatformImages.right.onload = () => {
+                game.assetsLoaded++;
+                checkGrassPlatformsLoaded();
+            };
+            game.grassPlatformImages.right.onerror = () => {
+                console.error('Failed to load right grass platform');
+                game.assetsLoaded++;
+                checkGrassPlatformsLoaded();
+            };
+
+            // Create ground platforms with grass sprites
             LEVEL_DATA.groundPlatforms.forEach(p => {
-                game.platforms.push(new Platform(p.x, p.y, p.w, 50, CONFIG.colors.ground));
+                game.platforms.push(new Platform(p.x, p.y, p.w, 50, CONFIG.colors.ground, true));
             });
 
-            // Create section platforms
+            // Create section platforms (regular style)
             LEVEL_DATA.sections.forEach(section => {
                 section.forEach(p => {
                     game.platforms.push(new Platform(p.x, p.y, p.w, 15));
@@ -611,6 +686,22 @@
             });
 
             console.log(`Game initialized: ${game.characters.length} characters, ${game.platforms.length} platforms`);
+        }
+
+        function checkGrassPlatformsLoaded() {
+            const leftLoaded = game.grassPlatformImages.left.complete;
+            const middleLoaded = game.grassPlatformImages.middle.complete;
+            const rightLoaded = game.grassPlatformImages.right.complete;
+
+            if (leftLoaded && middleLoaded && rightLoaded) {
+                game.grassPlatformImages.loaded = true;
+                console.log('Grass platform sprites loaded successfully');
+            }
+
+            if (game.assetsLoaded === game.totalAssets) {
+                game.gameStarted = true;
+                console.log('All assets loaded!');
+            }
         }
 
         // ===== DAMAGE SYSTEM =====

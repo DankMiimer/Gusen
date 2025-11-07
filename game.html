@@ -72,14 +72,17 @@
                 <strong>Controls:</strong>
                 <span class="key">←</span>
                 <span class="key">→</span>
-                to move,
+                move,
                 <span class="key">↑</span>
                 <span class="key">W</span>
                 <span class="key">Space</span>
-                to jump
+                jump/wall jump,
+                <span class="key">↓</span>
+                <span class="key">S</span>
+                stomp attack
             </div>
             <div class="info">
-                <strong>Goal:</strong> Jump across platforms and avoid NPCs!
+                <strong>Goal:</strong> Collect coins & gems, use power-ups, reach checkpoints, stomp enemies!
             </div>
             <div class="info" id="score">Score: 0</div>
         </div>
@@ -164,7 +167,34 @@
                 'sprite3.png', 'sprite4.png', 'sprite5.png', 'dinggusen.png',
                 'gressgusen.png', 'lanternegusen.png', 'lunagusen.png',
                 'spaghettigusen.png', 'wirelessgusen.png', 'generatorgusen.png'
-            ]
+            ],
+
+            // Collectibles
+            collectibles: {
+                coinValue: 10,
+                gemValue: 50,
+                size: 24,
+                bobSpeed: 0.05,
+                bobAmount: 5
+            },
+
+            // Power-ups
+            powerups: {
+                duration: 300, // 5 seconds at 60fps
+                speedMultiplier: 1.8,
+                jumpMultiplier: 1.4
+            },
+
+            // Timer
+            timer: {
+                enabled: true
+            },
+
+            // Moving platforms
+            movingPlatform: {
+                speed: 1.5,
+                range: 150
+            }
         };
 
         // ===== INITIALIZATION =====
@@ -192,18 +222,49 @@
             assetsLoaded: 0,
             totalAssets: 0,
             gameStarted: false,
-            hasWon: false
+            hasWon: false,
+            collectibles: [],
+            powerups: [],
+            particles: [],
+            checkpoints: [],
+            currentCheckpoint: null,
+            coinsCollected: 0,
+            gemsCollected: 0,
+            powerupTimers: {
+                speed: 0,
+                jump: 0,
+                shield: 0
+            },
+            timer: 0,
+            timerRunning: false
         };
 
         // ===== PLATFORM CLASS =====
         class Platform {
-            constructor(x, y, width, height, color = CONFIG.colors.platform, isGround = false) {
+            constructor(x, y, width, height, color = CONFIG.colors.platform, isGround = false, moving = false) {
                 this.x = x;
                 this.y = y;
                 this.width = width;
                 this.height = height;
                 this.color = color;
                 this.isGround = isGround;
+                this.moving = moving;
+                if (moving) {
+                    this.startX = x;
+                    this.speed = CONFIG.movingPlatform.speed;
+                    this.range = CONFIG.movingPlatform.range;
+                    this.direction = 1;
+                }
+            }
+
+            update() {
+                if (this.moving) {
+                    this.x += this.speed * this.direction;
+                    if (Math.abs(this.x - this.startX) > this.range) {
+                        this.direction *= -1;
+                        this.x = this.startX + (this.range * this.direction);
+                    }
+                }
             }
 
             draw(cameraX, cameraY) {
@@ -296,9 +357,216 @@
             }
         }
 
+        // ===== COLLECTIBLE CLASS =====
+        class Collectible {
+            constructor(x, y, type = 'coin') {
+                this.x = x;
+                this.y = y;
+                this.type = type; // 'coin' or 'gem'
+                this.size = CONFIG.collectibles.size;
+                this.collected = false;
+                this.bobOffset = 0;
+                this.startY = y;
+            }
+
+            update() {
+                this.bobOffset = Math.sin(game.frame * CONFIG.collectibles.bobSpeed) * CONFIG.collectibles.bobAmount;
+            }
+
+            draw(cameraX, cameraY) {
+                if (this.collected) return;
+
+                const screenX = this.x - cameraX;
+                const screenY = this.y + this.bobOffset - cameraY;
+
+                if (screenX < -50 || screenX > CONFIG.canvas.width + 50) return;
+
+                if (this.type === 'coin') {
+                    // Gold coin
+                    ctx.fillStyle = '#f4d03f';
+                    ctx.beginPath();
+                    ctx.arc(screenX, screenY, this.size / 2, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#d4af37';
+                    ctx.beginPath();
+                    ctx.arc(screenX, screenY, this.size / 3, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#996515';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(screenX, screenY, this.size / 2, 0, Math.PI * 2);
+                    ctx.stroke();
+                } else if (this.type === 'gem') {
+                    // Diamond gem
+                    ctx.fillStyle = '#3498db';
+                    ctx.beginPath();
+                    ctx.moveTo(screenX, screenY - this.size / 2);
+                    ctx.lineTo(screenX + this.size / 3, screenY);
+                    ctx.lineTo(screenX, screenY + this.size / 2);
+                    ctx.lineTo(screenX - this.size / 3, screenY);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.fillStyle = '#5dade2';
+                    ctx.fillRect(screenX - 5, screenY - 5, 10, 10);
+                    ctx.strokeStyle = '#1a5276';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(screenX, screenY - this.size / 2);
+                    ctx.lineTo(screenX + this.size / 3, screenY);
+                    ctx.lineTo(screenX, screenY + this.size / 2);
+                    ctx.lineTo(screenX - this.size / 3, screenY);
+                    ctx.closePath();
+                    ctx.stroke();
+                }
+            }
+
+            checkCollision(character) {
+                if (this.collected) return false;
+                const distance = Math.sqrt(
+                    Math.pow(character.x + character.width / 2 - this.x, 2) +
+                    Math.pow(character.y + character.height / 2 - this.y, 2)
+                );
+                return distance < this.size;
+            }
+        }
+
+        // ===== POWERUP CLASS =====
+        class Powerup {
+            constructor(x, y, type) {
+                this.x = x;
+                this.y = y;
+                this.type = type; // 'speed', 'jump', 'shield'
+                this.size = 30;
+                this.collected = false;
+                this.bobOffset = 0;
+            }
+
+            update() {
+                this.bobOffset = Math.sin(game.frame * 0.08) * 8;
+            }
+
+            draw(cameraX, cameraY) {
+                if (this.collected) return;
+
+                const screenX = this.x - cameraX;
+                const screenY = this.y + this.bobOffset - cameraY;
+
+                if (screenX < -50 || screenX > CONFIG.canvas.width + 50) return;
+
+                // Power-up box
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.fillRect(screenX - this.size / 2, screenY - this.size / 2, this.size, this.size);
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(screenX - this.size / 2, screenY - this.size / 2, this.size, this.size);
+
+                // Icon based on type
+                ctx.font = 'bold 20px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                if (this.type === 'speed') {
+                    ctx.fillStyle = '#3498db';
+                    ctx.fillText('⚡', screenX, screenY);
+                } else if (this.type === 'jump') {
+                    ctx.fillStyle = '#2ecc71';
+                    ctx.fillText('↑', screenX, screenY);
+                } else if (this.type === 'shield') {
+                    ctx.fillStyle = '#f39c12';
+                    ctx.fillText('🛡', screenX, screenY);
+                }
+            }
+
+            checkCollision(character) {
+                if (this.collected) return false;
+                return character.x < this.x + this.size / 2 &&
+                       character.x + character.width > this.x - this.size / 2 &&
+                       character.y < this.y + this.size / 2 &&
+                       character.y + character.height > this.y - this.size / 2;
+            }
+        }
+
+        // ===== PARTICLE CLASS =====
+        class Particle {
+            constructor(x, y, type = 'dust') {
+                this.x = x;
+                this.y = y;
+                this.type = type;
+                this.life = 30;
+                this.maxLife = 30;
+                this.velocityX = (Math.random() - 0.5) * 4;
+                this.velocityY = (Math.random() - 0.5) * 4 - 2;
+                this.size = Math.random() * 4 + 2;
+                this.color = type === 'dust' ? '#aaa' :
+                            type === 'sparkle' ? '#f4d03f' :
+                            type === 'damage' ? '#ff0000' : '#fff';
+            }
+
+            update() {
+                this.x += this.velocityX;
+                this.y += this.velocityY;
+                this.velocityY += 0.2; // gravity
+                this.life--;
+            }
+
+            draw(cameraX, cameraY) {
+                const screenX = this.x - cameraX;
+                const screenY = this.y - cameraY;
+                const alpha = this.life / this.maxLife;
+
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = alpha;
+                ctx.fillRect(screenX, screenY, this.size, this.size);
+                ctx.globalAlpha = 1;
+            }
+
+            isDead() {
+                return this.life <= 0;
+            }
+        }
+
+        // ===== CHECKPOINT CLASS =====
+        class Checkpoint {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.width = 40;
+                this.height = 80;
+                this.activated = false;
+            }
+
+            draw(cameraX, cameraY) {
+                const screenX = this.x - cameraX;
+                const screenY = this.y - cameraY;
+
+                if (screenX < -100 || screenX > CONFIG.canvas.width + 100) return;
+
+                // Flag pole
+                ctx.fillStyle = this.activated ? '#2ecc71' : '#7f8c8d';
+                ctx.fillRect(screenX, screenY, 6, this.height);
+
+                // Flag
+                ctx.fillStyle = this.activated ? '#27ae60' : '#95a5a6';
+                ctx.fillRect(screenX + 6, screenY + 10, 30, 20);
+
+                // Text
+                ctx.fillStyle = this.activated ? '#2ecc71' : '#7f8c8d';
+                ctx.font = 'bold 10px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('SAVE', screenX + 20, screenY + this.height + 15);
+            }
+
+            checkCollision(character) {
+                return character.x < this.x + this.width &&
+                       character.x + character.width > this.x &&
+                       character.y < this.y + this.height &&
+                       character.y + this.height > this.y;
+            }
+        }
+
         // ===== CHARACTER CLASS =====
         class Character {
-            constructor(imagePath, x, y, isPlayer = false) {
+            constructor(imagePath, x, y, isPlayer = false, enemyType = 'walking') {
                 this.x = x;
                 this.y = y;
                 this.scale = CONFIG.sprite.scale;
@@ -316,15 +584,20 @@
                 this.currentFrame = 1; // Start facing right
                 this.facingRight = true;
                 this.name = imagePath.replace('.png', '');
+                this.onWall = false;
+                this.wallJumpTimer = 0;
 
                 // Player-specific properties
                 if (isPlayer) {
                     this.jumpCount = 0; // For double jump
                     this.jumpPressed = false; // For preventing held key issues
+                    this.canWallJump = true;
+                    this.stompVelocity = -12;
                 }
 
                 // NPC-specific properties
                 if (!isPlayer) {
+                    this.enemyType = enemyType; // 'walking', 'flying', 'shooting', 'patrolling'
                     this.moveDirection = Math.random() > 0.5 ? 1 : -1;
                     this.jumpTimer = Math.floor(Math.random() * 60) + 30;
                     this.facingRight = this.moveDirection > 0;
@@ -332,6 +605,20 @@
                     this.isIdle = false;
                     this.idleTimer = 0;
                     this.idleCycleDuration = 120; // 2 seconds at 60fps
+
+                    // Flying enemy properties
+                    if (enemyType === 'flying') {
+                        this.flyHeight = y;
+                        this.flyAmplitude = 40;
+                        this.flySpeed = 0.03;
+                    }
+
+                    // Patrolling properties
+                    if (enemyType === 'patrolling') {
+                        this.patrolStart = x;
+                        this.patrolEnd = x + 200;
+                        this.patrolSpeed = 1;
+                    }
                 }
 
                 game.totalAssets++;
@@ -400,34 +687,128 @@
             }
 
             updatePlayer() {
+                // Apply power-ups
+                let speedMultiplier = game.powerupTimers.speed > 0 ? CONFIG.powerups.speedMultiplier : 1;
+                let jumpMultiplier = game.powerupTimers.jump > 0 ? CONFIG.powerups.jumpMultiplier : 1;
+
                 this.velocityX = 0;
 
                 if (game.keys['ArrowLeft'] || game.keys['a']) {
-                    this.velocityX = -this.speed;
+                    this.velocityX = -this.speed * speedMultiplier;
                     this.facingRight = false;
                     this.currentFrame = 0;
                 }
                 if (game.keys['ArrowRight'] || game.keys['d']) {
-                    this.velocityX = this.speed;
+                    this.velocityX = this.speed * speedMultiplier;
                     this.facingRight = true;
                     this.currentFrame = 1;
                 }
 
+                // Check for wall collision for wall jump
+                this.checkWallCollision();
+
+                // Wall jump mechanic
+                if (this.onWall && !this.onGround && this.canWallJump) {
+                    if ((game.keys['ArrowUp'] || game.keys['w'] || game.keys[' ']) && !this.jumpPressed) {
+                        this.velocityY = this.jumpPower * jumpMultiplier;
+                        this.velocityX = this.facingRight ? -8 : 8; // Jump away from wall
+                        this.jumpPressed = true;
+                        this.wallJumpTimer = 10;
+                        // Create wall jump particles
+                        for (let i = 0; i < 5; i++) {
+                            game.particles.push(new Particle(this.x + this.width / 2, this.y + this.height, 'dust'));
+                        }
+                    }
+                }
                 // Double jump mechanic
-                if ((game.keys['ArrowUp'] || game.keys['w'] || game.keys[' ']) && this.jumpCount < 2) {
+                else if ((game.keys['ArrowUp'] || game.keys['w'] || game.keys[' ']) && this.jumpCount < 2) {
                     // Prevent held key from triggering multiple jumps
                     if (!this.jumpPressed) {
-                        this.velocityY = this.jumpPower;
+                        this.velocityY = this.jumpPower * jumpMultiplier;
                         this.jumpCount++;
                         this.onGround = false;
                         this.jumpPressed = true;
+                        // Create jump particles
+                        for (let i = 0; i < 5; i++) {
+                            game.particles.push(new Particle(this.x + this.width / 2, this.y + this.height, 'dust'));
+                        }
+                        playSound('jump');
                     }
-                } else if (!game.keys['ArrowUp'] && !game.keys['w'] && !game.keys[' ']) {
+                }
+
+                if (!game.keys['ArrowUp'] && !game.keys['w'] && !game.keys[' ']) {
                     this.jumpPressed = false;
+                }
+
+                // Stomp attack - if falling and pressing down
+                if (this.velocityY > 0 && (game.keys['ArrowDown'] || game.keys['s'])) {
+                    this.velocityY = Math.max(this.velocityY, 15); // Fast fall
+                    this.isStomping = true;
+                } else {
+                    this.isStomping = false;
+                }
+
+                if (this.wallJumpTimer > 0) this.wallJumpTimer--;
+            }
+
+            checkWallCollision() {
+                this.onWall = false;
+                if (this.onGround) return;
+
+                // Check platforms for walls
+                for (let platform of game.platforms) {
+                    // Right wall
+                    if (this.velocityX > 0 &&
+                        this.x + this.width >= platform.x &&
+                        this.x + this.width <= platform.x + 10 &&
+                        this.y + this.height > platform.y &&
+                        this.y < platform.y + platform.height) {
+                        this.onWall = true;
+                        this.velocityY = Math.min(this.velocityY, 2); // Slow fall on wall
+                        break;
+                    }
+                    // Left wall
+                    if (this.velocityX < 0 &&
+                        this.x <= platform.x + platform.width &&
+                        this.x >= platform.x + platform.width - 10 &&
+                        this.y + this.height > platform.y &&
+                        this.y < platform.y + platform.height) {
+                        this.onWall = true;
+                        this.velocityY = Math.min(this.velocityY, 2); // Slow fall on wall
+                        break;
+                    }
                 }
             }
 
             updateNPC() {
+                // Flying enemy behavior
+                if (this.enemyType === 'flying') {
+                    this.y = this.flyHeight + Math.sin(game.frame * this.flySpeed) * this.flyAmplitude;
+                    this.velocityX = this.moveDirection * this.speed;
+                    this.velocityY = 0; // Flying enemies don't fall
+                    this.currentFrame = this.moveDirection > 0 ? 1 : 0;
+
+                    // Turn around at world bounds
+                    if (this.x <= 0 || this.x >= CONFIG.world.width - this.width) {
+                        this.moveDirection *= -1;
+                    }
+                    return;
+                }
+
+                // Patrolling enemy behavior
+                if (this.enemyType === 'patrolling') {
+                    if (this.x >= this.patrolEnd) {
+                        this.moveDirection = -1;
+                    } else if (this.x <= this.patrolStart) {
+                        this.moveDirection = 1;
+                    }
+                    this.velocityX = this.moveDirection * this.patrolSpeed;
+                    this.currentFrame = this.moveDirection > 0 ? 1 : 0;
+                    this.facingRight = this.moveDirection > 0;
+                    return;
+                }
+
+                // Walking enemy behavior (original)
                 // Handle idle state
                 if (this.isIdle) {
                     this.idleTimer++;
@@ -552,6 +933,68 @@
             }
         }
 
+        // ===== SOUND SYSTEM =====
+        const sounds = {
+            jump: null,
+            collect: null,
+            damage: null,
+            powerup: null,
+            win: null
+        };
+
+        function playSound(soundName) {
+            // Simple beep using Web Audio API
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                // Different frequencies for different sounds
+                switch(soundName) {
+                    case 'jump':
+                        oscillator.frequency.value = 300;
+                        gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+                        oscillator.start(audioContext.currentTime);
+                        oscillator.stop(audioContext.currentTime + 0.1);
+                        break;
+                    case 'collect':
+                        oscillator.frequency.value = 500;
+                        gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+                        oscillator.start(audioContext.currentTime);
+                        oscillator.stop(audioContext.currentTime + 0.15);
+                        break;
+                    case 'damage':
+                        oscillator.frequency.value = 150;
+                        gainNode.gain.setValueAtTime(0.15, audioContext.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+                        oscillator.start(audioContext.currentTime);
+                        oscillator.stop(audioContext.currentTime + 0.2);
+                        break;
+                    case 'powerup':
+                        oscillator.frequency.value = 600;
+                        gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.25);
+                        oscillator.start(audioContext.currentTime);
+                        oscillator.stop(audioContext.currentTime + 0.25);
+                        break;
+                    case 'win':
+                        oscillator.frequency.value = 700;
+                        gainNode.gain.setValueAtTime(0.15, audioContext.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                        oscillator.start(audioContext.currentTime);
+                        oscillator.stop(audioContext.currentTime + 0.5);
+                        break;
+                }
+            } catch (e) {
+                console.log('Audio not supported');
+            }
+        }
+
         // ===== LEVEL DATA =====
         const LEVEL_DATA = {
             groundPlatforms: [
@@ -654,23 +1097,78 @@
                 });
             });
 
+            // Add some moving platforms
+            game.platforms.push(new Platform(1200, 300, 100, 15, CONFIG.colors.platform, false, true));
+            game.platforms.push(new Platform(2500, 400, 100, 15, CONFIG.colors.platform, false, true));
+            game.platforms.push(new Platform(3800, 250, 100, 15, CONFIG.colors.platform, false, true));
+            game.platforms.push(new Platform(5300, 350, 100, 15, CONFIG.colors.platform, false, true));
+
             // Create player
             game.player = new Character('player.png', CONFIG.player.startX, CONFIG.player.startY, true);
             game.characters.push(game.player);
 
-            // Create NPCs
+            // Create NPCs with different types
+            const enemyTypes = ['walking', 'walking', 'patrolling', 'walking', 'flying', 'walking', 'patrolling'];
             LEVEL_DATA.npcPositions.forEach((pos, i) => {
                 const sprite = CONFIG.npcSprites[i % CONFIG.npcSprites.length];
-                game.characters.push(new Character(sprite, pos.x, pos.y, false));
+                const enemyType = enemyTypes[i % enemyTypes.length];
+                game.characters.push(new Character(sprite, pos.x, pos.y, false, enemyType));
             });
 
-            console.log(`Game initialized: ${game.characters.length} characters, ${game.platforms.length} platforms`);
+            // Create collectibles (coins scattered throughout)
+            const coinPositions = [
+                300, 500, 800, 1100, 1400, 1700, 2000, 2300, 2600, 2900,
+                3200, 3500, 3800, 4100, 4400, 4700, 5000, 5300, 5600, 5900
+            ];
+            coinPositions.forEach(x => {
+                game.collectibles.push(new Collectible(x, 300, 'coin'));
+                game.collectibles.push(new Collectible(x + 50, 350, 'coin'));
+            });
+
+            // Add gems (fewer, more valuable)
+            game.collectibles.push(new Collectible(1500, 200, 'gem'));
+            game.collectibles.push(new Collectible(2500, 150, 'gem'));
+            game.collectibles.push(new Collectible(3800, 100, 'gem'));
+            game.collectibles.push(new Collectible(5200, 200, 'gem'));
+
+            // Create power-ups
+            game.powerups.push(new Powerup(900, 400, 'speed'));
+            game.powerups.push(new Powerup(2200, 300, 'jump'));
+            game.powerups.push(new Powerup(3500, 350, 'shield'));
+            game.powerups.push(new Powerup(4800, 300, 'speed'));
+
+            // Create checkpoints
+            game.checkpoints.push(new Checkpoint(1300, 470));
+            game.checkpoints.push(new Checkpoint(2700, 470));
+            game.checkpoints.push(new Checkpoint(4200, 470));
+            game.checkpoints.push(new Checkpoint(5700, 470));
+
+            console.log(`Game initialized: ${game.characters.length} characters, ${game.platforms.length} platforms, ${game.collectibles.length} collectibles`);
         }
 
         // ===== DAMAGE SYSTEM =====
         function damagePlayer() {
             if (game.invincibilityTimer > 0 || game.isDead) return;
+
+            // Shield power-up prevents damage
+            if (game.powerupTimers.shield > 0) {
+                game.powerupTimers.shield = 0; // Use up shield
+                playSound('powerup');
+                return;
+            }
+
             game.lives--;
+
+            // Create damage particles
+            for (let i = 0; i < 10; i++) {
+                game.particles.push(new Particle(
+                    game.player.x + game.player.width / 2,
+                    game.player.y + game.player.height / 2,
+                    'damage'
+                ));
+            }
+
+            playSound('damage');
 
             // Give invincibility after taking damage
             game.invincibilityTimer = CONFIG.player.invincibilityFrames;
@@ -802,23 +1300,53 @@
         }
 
         function drawUI() {
-            // Pixel art style UI box with border
+            // Pixel art style UI box with border (expanded)
             ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-            ctx.fillRect(10, 10, 280, 70);
+            ctx.fillRect(10, 10, 350, 110);
             ctx.strokeStyle = '#ffffff';
             ctx.lineWidth = 3;
-            ctx.strokeRect(10, 10, 280, 70);
+            ctx.strokeRect(10, 10, 350, 110);
             ctx.strokeStyle = '#888888';
             ctx.lineWidth = 2;
-            ctx.strokeRect(13, 13, 274, 64);
+            ctx.strokeRect(13, 13, 344, 104);
 
             ctx.fillStyle = '#f4d03f';
-            ctx.font = 'bold 16px monospace';
+            ctx.font = 'bold 14px monospace';
             ctx.textAlign = 'left';
-            ctx.fillText('Position: ' + Math.floor(game.player.x) + 'px', 20, 30);
-            ctx.fillText('Score: ' + game.score, 20, 50);
+            ctx.fillText('Position: ' + Math.floor(game.player.x) + 'px', 20, 28);
+            ctx.fillText('Score: ' + game.score, 20, 46);
             ctx.fillStyle = game.lives > 0 ? '#ff0000' : '#666666';
-            ctx.fillText('Lives: ' + '♥'.repeat(game.lives), 20, 70);
+            ctx.fillText('Lives: ' + '♥'.repeat(game.lives), 20, 64);
+
+            // Collectibles
+            ctx.fillStyle = '#f4d03f';
+            ctx.fillText('Coins: ' + game.coinsCollected, 20, 82);
+            ctx.fillStyle = '#3498db';
+            ctx.fillText('Gems: ' + game.gemsCollected, 150, 82);
+
+            // Timer
+            if (game.timerRunning || game.timer > 0) {
+                const seconds = (game.timer / 60).toFixed(1);
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText('Time: ' + seconds + 's', 20, 100);
+            }
+
+            // Active power-ups
+            let powerupX = 200;
+            if (game.powerupTimers.speed > 0) {
+                ctx.fillStyle = '#3498db';
+                ctx.fillText('⚡ SPEED', powerupX, 28);
+                powerupX += 100;
+            }
+            if (game.powerupTimers.jump > 0) {
+                ctx.fillStyle = '#2ecc71';
+                ctx.fillText('↑ JUMP', powerupX, 28);
+                powerupX += 90;
+            }
+            if (game.powerupTimers.shield > 0) {
+                ctx.fillStyle = '#f39c12';
+                ctx.fillText('🛡 SHIELD', powerupX, 28);
+            }
 
             // Victory screen - Pixel art style
             if (game.hasWon) {
@@ -934,10 +1462,83 @@
 
             // Update timers
             if (game.invincibilityTimer > 0) game.invincibilityTimer--;
+            if (game.powerupTimers.speed > 0) game.powerupTimers.speed--;
+            if (game.powerupTimers.jump > 0) game.powerupTimers.jump--;
+            if (game.powerupTimers.shield > 0) game.powerupTimers.shield--;
+
+            // Update game timer
+            if (game.timerRunning) {
+                game.timer++;
+            }
 
             // Update game logic
             if (!game.isDead && !game.hasWon) {
+                // Update moving platforms
+                game.platforms.forEach(p => {
+                    if (p.moving) p.update();
+                });
+
+                // Update characters
                 game.characters.forEach(char => char.update());
+
+                // Update collectibles
+                game.collectibles.forEach(c => c.update());
+
+                // Update power-ups
+                game.powerups.forEach(p => p.update());
+
+                // Update particles
+                game.particles.forEach(p => p.update());
+                game.particles = game.particles.filter(p => !p.isDead());
+
+                // Collectible collection
+                if (game.player) {
+                    game.collectibles.forEach(collectible => {
+                        if (collectible.checkCollision(game.player)) {
+                            collectible.collected = true;
+                            if (collectible.type === 'coin') {
+                                game.score += CONFIG.collectibles.coinValue;
+                                game.coinsCollected++;
+                            } else if (collectible.type === 'gem') {
+                                game.score += CONFIG.collectibles.gemValue;
+                                game.gemsCollected++;
+                            }
+                            // Create sparkle particles
+                            for (let i = 0; i < 8; i++) {
+                                game.particles.push(new Particle(collectible.x, collectible.y, 'sparkle'));
+                            }
+                            playSound('collect');
+                        }
+                    });
+
+                    // Power-up collection
+                    game.powerups.forEach(powerup => {
+                        if (powerup.checkCollision(game.player)) {
+                            powerup.collected = true;
+                            game.powerupTimers[powerup.type] = CONFIG.powerups.duration;
+                            playSound('powerup');
+                            // Create particles
+                            for (let i = 0; i < 12; i++) {
+                                game.particles.push(new Particle(powerup.x, powerup.y, 'sparkle'));
+                            }
+                        }
+                    });
+
+                    // Checkpoint activation
+                    game.checkpoints.forEach(checkpoint => {
+                        if (checkpoint.checkCollision(game.player) && !checkpoint.activated) {
+                            checkpoint.activated = true;
+                            game.currentCheckpoint = checkpoint;
+                            game.score += 100;
+                            playSound('collect');
+                        }
+                    });
+
+                    // Start timer on first movement
+                    if (!game.timerRunning && (game.keys['ArrowLeft'] || game.keys['ArrowRight'] || game.keys['a'] || game.keys['d'])) {
+                        game.timerRunning = true;
+                    }
+                }
 
                 // Win detection
                 if (game.player) {
@@ -953,26 +1554,46 @@
                         game.player.y < goalBox.y + goalBox.height &&
                         game.player.y + game.player.height > goalBox.y) {
                         game.hasWon = true;
+                        game.timerRunning = false;
                         game.score += 1000; // Bonus points for winning
+                        playSound('win');
                     }
 
                     // Damage checks - falling off the world
                     if (game.player.y > CONFIG.world.height + 100) {
                         damagePlayer();
-                        // Respawn at last safe position (start)
+                        // Respawn at last checkpoint or start
                         if (!game.isDead) {
-                            game.player.y = CONFIG.player.startY;
-                            game.player.x = CONFIG.player.startX;
+                            if (game.currentCheckpoint) {
+                                game.player.x = game.currentCheckpoint.x;
+                                game.player.y = game.currentCheckpoint.y - game.player.height;
+                            } else {
+                                game.player.y = CONFIG.player.startY;
+                                game.player.x = CONFIG.player.startX;
+                            }
                             game.player.velocityX = 0;
                             game.player.velocityY = 0;
                         }
                     }
 
-                    // Damage checks - enemy collision
+                    // Enemy collision / stomp attack
                     if (game.invincibilityTimer === 0) {
                         game.characters.forEach(char => {
                             if (!char.isPlayer && char.loaded && game.player.checkCollision(char)) {
-                                damagePlayer();
+                                // Stomp attack - if player is above enemy and falling
+                                if (game.player.isStomping && game.player.y + game.player.height / 2 < char.y) {
+                                    // Remove enemy
+                                    char.y = -1000; // Move off screen
+                                    game.score += 50;
+                                    game.player.velocityY = game.player.stompVelocity; // Bounce
+                                    // Create particles
+                                    for (let i = 0; i < 15; i++) {
+                                        game.particles.push(new Particle(char.x + char.width / 2, char.y + char.height / 2, 'sparkle'));
+                                    }
+                                    playSound('collect');
+                                } else {
+                                    damagePlayer();
+                                }
                             }
                         });
                     }
@@ -981,8 +1602,12 @@
 
             // Render
             game.platforms.forEach(p => p.draw(game.camera.x, game.camera.y));
+            game.collectibles.forEach(c => c.draw(game.camera.x, game.camera.y));
+            game.powerups.forEach(p => p.draw(game.camera.x, game.camera.y));
+            game.checkpoints.forEach(c => c.draw(game.camera.x, game.camera.y));
             drawGoal(game.camera.x, game.camera.y);
             game.characters.forEach(c => c.draw(game.camera.x, game.camera.y));
+            game.particles.forEach(p => p.draw(game.camera.x, game.camera.y));
             drawUI();
 
             game.frame++;

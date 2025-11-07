@@ -30,6 +30,18 @@
             background: #87ceeb;
             image-rendering: pixelated;
             image-rendering: crisp-edges;
+            image-rendering: -moz-crisp-edges;
+        }
+
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
         }
 
         #controls {
@@ -86,13 +98,22 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
+        // Disable image smoothing for crisp pixel art
+        ctx.imageSmoothingEnabled = false;
+        ctx.mozImageSmoothingEnabled = false;
+        ctx.webkitImageSmoothingEnabled = false;
+        ctx.msImageSmoothingEnabled = false;
+
         // Game state
         const game = {
             score: 0,
             frame: 0,
             keys: {},
             characters: [],
-            player: null
+            player: null,
+            assetsLoaded: 0,
+            totalAssets: 0,
+            gameStarted: false
         };
 
         // Sprite class to handle 2-frame animations
@@ -100,9 +121,10 @@
             constructor(imagePath, x, y, isPlayer = false) {
                 this.x = x;
                 this.y = y;
-                this.width = 32;
-                this.height = 32;
-                this.speed = isPlayer ? 3 : 1;
+                this.scale = 4; // Scale up the tiny sprites
+                this.width = 64; // Will be adjusted when image loads
+                this.height = 64; // Will be adjusted when image loads
+                this.speed = isPlayer ? 3 : 1.5;
                 this.isPlayer = isPlayer;
                 this.image = new Image();
                 this.image.src = imagePath;
@@ -110,6 +132,7 @@
                 this.currentFrame = 0;
                 this.frameTimer = 0;
                 this.frameDelay = 15; // Frames between sprite animation
+                this.name = imagePath.replace('.png', '');
 
                 // Movement for NPCs
                 if (!isPlayer) {
@@ -118,11 +141,31 @@
                     this.changeDirectionTimer = 0;
                 }
 
+                game.totalAssets++;
+
                 this.image.onload = () => {
                     this.loaded = true;
+                    game.assetsLoaded++;
                     // Image is split horizontally: top half is frame 0, bottom half is frame 1
                     this.frameHeight = this.image.height / 2;
                     this.frameWidth = this.image.width;
+                    // Adjust character size based on actual sprite size
+                    this.width = this.frameWidth * this.scale;
+                    this.height = this.frameHeight * this.scale;
+                    console.log(`Loaded ${imagePath}: ${this.frameWidth}x${this.frameHeight} (scaled to ${this.width}x${this.height})`);
+
+                    if (game.assetsLoaded === game.totalAssets) {
+                        console.log('All assets loaded!');
+                        game.gameStarted = true;
+                    }
+                };
+
+                this.image.onerror = () => {
+                    console.error(`Failed to load image: ${imagePath}`);
+                    game.assetsLoaded++;
+                    if (game.assetsLoaded === game.totalAssets) {
+                        game.gameStarted = true;
+                    }
                 };
             }
 
@@ -171,6 +214,9 @@
             draw() {
                 if (!this.loaded) return;
 
+                // Save context state
+                ctx.save();
+
                 // Draw the current frame (split horizontally)
                 ctx.drawImage(
                     this.image,
@@ -178,20 +224,23 @@
                     this.currentFrame * this.frameHeight, // source y (0 for frame 0, frameHeight for frame 1)
                     this.frameWidth, // source width
                     this.frameHeight, // source height
-                    this.x, // destination x
-                    this.y, // destination y
-                    this.width, // destination width
-                    this.height // destination height
+                    Math.floor(this.x), // destination x
+                    Math.floor(this.y), // destination y
+                    this.width, // destination width (scaled)
+                    this.height // destination height (scaled)
                 );
 
                 // Draw name tag for player
                 if (this.isPlayer) {
-                    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-                    ctx.fillRect(this.x - 5, this.y - 15, 42, 12);
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    ctx.fillRect(this.x, this.y - 20, this.width, 15);
                     ctx.fillStyle = 'white';
-                    ctx.font = '10px Arial';
-                    ctx.fillText('YOU', this.x, this.y - 6);
+                    ctx.font = 'bold 12px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('PLAYER', this.x + this.width / 2, this.y - 8);
                 }
+
+                ctx.restore();
             }
 
             checkCollision(other) {
@@ -229,10 +278,13 @@
             // Create NPCs at random positions
             for (let i = 0; i < 8; i++) {
                 const sprite = npcSprites[i % npcSprites.length];
-                const x = Math.random() * (canvas.width - 32);
-                const y = Math.random() * (canvas.height - 32);
+                const x = Math.random() * (canvas.width - 100);
+                const y = Math.random() * (canvas.height - 100);
                 game.characters.push(new Character(sprite, x, y, false));
             }
+
+            console.log(`Game initialized with ${game.characters.length} characters`);
+            console.log(`Loading ${game.totalAssets} assets...`);
         }
 
         // Game loop
@@ -240,6 +292,20 @@
             // Clear canvas
             ctx.fillStyle = '#87ceeb';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Show loading screen if assets aren't loaded
+            if (!game.gameStarted) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 32px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('Loading...', canvas.width / 2, canvas.height / 2 - 20);
+                ctx.font = '20px Arial';
+                ctx.fillText(`${game.assetsLoaded} / ${game.totalAssets} sprites loaded`, canvas.width / 2, canvas.height / 2 + 20);
+                requestAnimationFrame(gameLoop);
+                return;
+            }
 
             // Draw ground/grass pattern
             ctx.fillStyle = '#90ee90';
@@ -276,10 +342,12 @@
 
             // Draw UI
             ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-            ctx.fillRect(10, 10, 200, 30);
+            ctx.fillRect(10, 10, 250, 50);
             ctx.fillStyle = 'white';
             ctx.font = '16px Arial';
+            ctx.textAlign = 'left';
             ctx.fillText('Characters: ' + game.characters.length, 20, 30);
+            ctx.fillText('Loaded: ' + game.characters.filter(c => c.loaded).length, 20, 50);
 
             game.frame++;
             requestAnimationFrame(gameLoop);

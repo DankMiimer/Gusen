@@ -340,11 +340,6 @@
                 if (this.velocityY > CONFIG.physics.terminalVelocity) {
                     this.velocityY = CONFIG.physics.terminalVelocity;
                 }
-
-                // NPC bounds and direction change
-                if (!this.isPlayer && (this.x <= 0 || this.x >= CONFIG.world.width - this.width)) {
-                    this.moveDirection *= -1;
-                }
             }
 
             updatePlayer() {
@@ -376,6 +371,28 @@
             }
 
             updateNPC() {
+                // Edge detection - check if about to walk off platform
+                if (this.onGround) {
+                    const checkDistance = 30; // Look ahead 30px
+                    const checkX = this.moveDirection > 0 ? this.x + this.width + checkDistance : this.x - checkDistance;
+                    const checkY = this.y + this.height + 10; // Check slightly below feet
+
+                    // Check if there's a platform ahead
+                    let platformAhead = false;
+                    for (let platform of game.platforms) {
+                        if (checkX > platform.x && checkX < platform.x + platform.width &&
+                            checkY > platform.y && checkY < platform.y + platform.height + 20) {
+                            platformAhead = true;
+                            break;
+                        }
+                    }
+
+                    // Turn around if no platform ahead or hit world bounds
+                    if (!platformAhead || this.x <= 0 || this.x >= CONFIG.world.width - this.width) {
+                        this.moveDirection *= -1;
+                    }
+                }
+
                 this.velocityX = this.moveDirection * this.speed;
                 this.currentFrame = this.moveDirection > 0 ? 1 : 0;
                 this.facingRight = this.moveDirection > 0;

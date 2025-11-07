@@ -926,9 +926,16 @@
                     this.velocityY = 0; // Flying enemies don't fall
                     this.currentFrame = this.moveDirection > 0 ? 1 : 0;
 
-                    // Turn around at world bounds
-                    if (this.x <= 0 || this.x >= CONFIG.world.width - this.width) {
-                        this.moveDirection *= -1;
+                    // Turn around before hitting world bounds (with margin)
+                    const margin = 50;
+                    if (this.x <= margin && this.moveDirection < 0) {
+                        this.moveDirection = 1;
+                        this.velocityX = this.moveDirection * this.speed;
+                        this.x = margin; // Clamp position
+                    } else if (this.x >= CONFIG.world.width - this.width - margin && this.moveDirection > 0) {
+                        this.moveDirection = -1;
+                        this.velocityX = this.moveDirection * this.speed;
+                        this.x = CONFIG.world.width - this.width - margin; // Clamp position
                     }
                     return;
                 }

@@ -64,9 +64,11 @@ The game includes various character sprites:
 - Special characters: Ding Gusen, Gress Gusen, Lanterne Gusen, Luna Gusen, Spaghetti Gusen, Wireless Gusen, Generator Gusen
 - Additional sprites (sprite1-5)
 
-All sprites use a 2-frame animation system where the image is split horizontally:
-- Top half = Frame 1
-- Bottom half = Frame 2
+All sprites use a 2-frame directional animation system where the image is split horizontally:
+- **Top half** = Left movement animation
+- **Bottom half** = Right movement animation
+
+The game automatically switches between frames based on the character's horizontal movement direction.
 
 ## Technical Details
 

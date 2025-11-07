@@ -116,7 +116,9 @@
             gameStarted: false
         };
 
-        // Sprite class to handle 2-frame animations
+        // Sprite class to handle 2-frame directional animations
+        // Frame 0 (top half) = Left movement
+        // Frame 1 (bottom half) = Right movement
         class Character {
             constructor(imagePath, x, y, isPlayer = false) {
                 this.x = x;
@@ -129,9 +131,8 @@
                 this.image = new Image();
                 this.image.src = imagePath;
                 this.loaded = false;
-                this.currentFrame = 0;
-                this.frameTimer = 0;
-                this.frameDelay = 15; // Frames between sprite animation
+                this.currentFrame = 1; // Start facing right
+                this.facingRight = true; // Track which direction we're facing
                 this.name = imagePath.replace('.png', '');
 
                 // Movement for NPCs
@@ -139,6 +140,9 @@
                     this.dirX = (Math.random() - 0.5) * 2;
                     this.dirY = (Math.random() - 0.5) * 2;
                     this.changeDirectionTimer = 0;
+                    // Set initial frame based on initial direction
+                    this.facingRight = this.dirX >= 0;
+                    this.currentFrame = this.facingRight ? 1 : 0;
                 }
 
                 game.totalAssets++;
@@ -170,19 +174,30 @@
             }
 
             update() {
-                // Update animation
-                this.frameTimer++;
-                if (this.frameTimer >= this.frameDelay) {
-                    this.currentFrame = (this.currentFrame + 1) % 2;
-                    this.frameTimer = 0;
-                }
-
                 if (this.isPlayer) {
                     // Player movement
-                    if (game.keys['ArrowUp'] || game.keys['w']) this.y -= this.speed;
-                    if (game.keys['ArrowDown'] || game.keys['s']) this.y += this.speed;
-                    if (game.keys['ArrowLeft'] || game.keys['a']) this.x -= this.speed;
-                    if (game.keys['ArrowRight'] || game.keys['d']) this.x += this.speed;
+                    let moving = false;
+
+                    if (game.keys['ArrowUp'] || game.keys['w']) {
+                        this.y -= this.speed;
+                        moving = true;
+                    }
+                    if (game.keys['ArrowDown'] || game.keys['s']) {
+                        this.y += this.speed;
+                        moving = true;
+                    }
+                    if (game.keys['ArrowLeft'] || game.keys['a']) {
+                        this.x -= this.speed;
+                        this.facingRight = false;
+                        this.currentFrame = 0; // Top frame for left movement
+                        moving = true;
+                    }
+                    if (game.keys['ArrowRight'] || game.keys['d']) {
+                        this.x += this.speed;
+                        this.facingRight = true;
+                        this.currentFrame = 1; // Bottom frame for right movement
+                        moving = true;
+                    }
 
                     // Keep player in bounds
                     this.x = Math.max(0, Math.min(canvas.width - this.width, this.x));
@@ -198,6 +213,16 @@
 
                     this.x += this.dirX * this.speed;
                     this.y += this.dirY * this.speed;
+
+                    // Update frame based on horizontal direction
+                    if (this.dirX < 0) {
+                        this.facingRight = false;
+                        this.currentFrame = 0; // Top frame for left movement
+                    } else if (this.dirX > 0) {
+                        this.facingRight = true;
+                        this.currentFrame = 1; // Bottom frame for right movement
+                    }
+                    // If dirX is 0, keep the current frame
 
                     // Bounce off walls
                     if (this.x < 0 || this.x > canvas.width - this.width) {

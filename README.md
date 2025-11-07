@@ -1,14 +1,16 @@
-# Gusen Character Game 🎮
+# Gusen Platformer Game 🎮
 
-A fun 2D character animation game using sprite-based characters with 2-frame animations!
+A fun 2D sidescrolling platformer with sprite-based characters and 2-frame directional animations!
 
 ## Features
 
-- **Animated Characters**: All characters use 2-frame sprite animations (frames split horizontally)
-- **Player Control**: Move your character around the map using arrow keys
-- **NPCs**: Multiple AI-controlled characters roaming the world
-- **Score System**: Earn points by interacting with other characters
+- **Platformer Physics**: Full gravity, jumping, and collision detection
+- **Animated Characters**: All characters use 2-frame directional sprite animations (frames split horizontally)
+- **Player Control**: Run and jump through multiple platforms
+- **AI NPCs**: Characters that walk, jump, and explore the platforms autonomously
+- **Score System**: Earn points by meeting other characters
 - **Beautiful Graphics**: Pixel-art style characters with smooth animations
+- **Multi-level Platforming**: Jump across various platforms at different heights
 
 ## How to Play
 
@@ -52,9 +54,18 @@ Then open: `http://localhost:8000/game.html`
 
 ### Game Controls
 
-1. Use **Arrow Keys** (↑↓←→) or **WASD** to move your character
-2. Explore the world and interact with NPCs to earn points
-3. Try to meet all the different characters!
+**Movement:**
+- **Left Arrow** or **A** - Move left
+- **Right Arrow** or **D** - Move right
+
+**Jumping:**
+- **Up Arrow**, **W**, or **Space** - Jump (only works when on ground or platform)
+
+**Gameplay:**
+1. Jump across platforms to explore the level
+2. Meet NPCs to earn points
+3. Use momentum to reach higher platforms
+4. Watch the NPCs as they autonomously explore and jump around!
 
 ## Character Sprites
 
@@ -74,6 +85,8 @@ The game automatically switches between frames based on the character's horizont
 
 - Built with HTML5 Canvas
 - Vanilla JavaScript (no external libraries)
-- Sprite animation system with frame splitting
-- Simple collision detection
-- Responsive controls
+- Platformer physics with gravity and jumping
+- Directional sprite animation system with frame splitting
+- Platform collision detection (top, bottom, and side collisions)
+- AI pathfinding for NPCs
+- Responsive controls with multiple input options

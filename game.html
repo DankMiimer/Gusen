@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gusen Character Game</title>
+    <title>Gusen Platformer Game</title>
     <style>
         body {
             margin: 0;
@@ -75,20 +75,22 @@
     </style>
 </head>
 <body>
-    <h1>🎮 Gusen Character Game 🎮</h1>
+    <h1>🎮 Gusen Platformer Game 🎮</h1>
     <div id="gameContainer">
         <canvas id="gameCanvas" width="800" height="600"></canvas>
         <div id="controls">
             <div class="info">
                 <strong>Controls:</strong>
-                <span class="key">↑</span>
-                <span class="key">↓</span>
                 <span class="key">←</span>
                 <span class="key">→</span>
-                to move player
+                to move,
+                <span class="key">↑</span>
+                <span class="key">W</span>
+                <span class="key">Space</span>
+                to jump
             </div>
             <div class="info">
-                <strong>Goal:</strong> Explore the world and interact with other characters!
+                <strong>Goal:</strong> Jump across platforms and meet other characters!
             </div>
             <div class="info" id="score">Score: 0</div>
         </div>
@@ -113,8 +115,37 @@
             player: null,
             assetsLoaded: 0,
             totalAssets: 0,
-            gameStarted: false
+            gameStarted: false,
+            gravity: 0.5,
+            platforms: []
         };
+
+        // Platform class
+        class Platform {
+            constructor(x, y, width, height, color = '#8B4513') {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+                this.color = color;
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+                // Add some detail
+                ctx.strokeStyle = '#654321';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(this.x, this.y, this.width, this.height);
+            }
+
+            checkCollision(character) {
+                return character.x < this.x + this.width &&
+                       character.x + character.width > this.x &&
+                       character.y < this.y + this.height &&
+                       character.y + character.height > this.y;
+            }
+        }
 
         // Sprite class to handle 2-frame directional animations
         // Frame 0 (top half) = Left movement
@@ -126,8 +157,12 @@
                 this.scale = 4; // Scale up the tiny sprites
                 this.width = 64; // Will be adjusted when image loads
                 this.height = 64; // Will be adjusted when image loads
-                this.speed = isPlayer ? 3 : 1.5;
+                this.velocityX = 0;
+                this.velocityY = 0;
+                this.speed = isPlayer ? 5 : 2;
+                this.jumpPower = isPlayer ? -12 : -10;
                 this.isPlayer = isPlayer;
+                this.onGround = false;
                 this.image = new Image();
                 this.image.src = imagePath;
                 this.loaded = false;
@@ -137,11 +172,10 @@
 
                 // Movement for NPCs
                 if (!isPlayer) {
-                    this.dirX = (Math.random() - 0.5) * 2;
-                    this.dirY = (Math.random() - 0.5) * 2;
-                    this.changeDirectionTimer = 0;
+                    this.moveDirection = Math.random() > 0.5 ? 1 : -1;
+                    this.jumpTimer = Math.floor(Math.random() * 60) + 30;
                     // Set initial frame based on initial direction
-                    this.facingRight = this.dirX >= 0;
+                    this.facingRight = this.moveDirection > 0;
                     this.currentFrame = this.facingRight ? 1 : 0;
                 }
 
@@ -174,66 +208,112 @@
             }
 
             update() {
-                if (this.isPlayer) {
-                    // Player movement
-                    let moving = false;
+                // Apply gravity
+                this.velocityY += game.gravity;
 
-                    if (game.keys['ArrowUp'] || game.keys['w']) {
-                        this.y -= this.speed;
-                        moving = true;
-                    }
-                    if (game.keys['ArrowDown'] || game.keys['s']) {
-                        this.y += this.speed;
-                        moving = true;
-                    }
+                if (this.isPlayer) {
+                    // Player horizontal movement
+                    this.velocityX = 0;
+
                     if (game.keys['ArrowLeft'] || game.keys['a']) {
-                        this.x -= this.speed;
+                        this.velocityX = -this.speed;
                         this.facingRight = false;
                         this.currentFrame = 0; // Top frame for left movement
-                        moving = true;
                     }
                     if (game.keys['ArrowRight'] || game.keys['d']) {
-                        this.x += this.speed;
+                        this.velocityX = this.speed;
                         this.facingRight = true;
                         this.currentFrame = 1; // Bottom frame for right movement
-                        moving = true;
                     }
 
-                    // Keep player in bounds
-                    this.x = Math.max(0, Math.min(canvas.width - this.width, this.x));
-                    this.y = Math.max(0, Math.min(canvas.height - this.height, this.y));
+                    // Jump
+                    if ((game.keys['ArrowUp'] || game.keys['w'] || game.keys[' ']) && this.onGround) {
+                        this.velocityY = this.jumpPower;
+                        this.onGround = false;
+                    }
                 } else {
                     // NPC movement
-                    this.changeDirectionTimer++;
-                    if (this.changeDirectionTimer > 120) {
-                        this.dirX = (Math.random() - 0.5) * 2;
-                        this.dirY = (Math.random() - 0.5) * 2;
-                        this.changeDirectionTimer = 0;
-                    }
+                    this.velocityX = this.moveDirection * this.speed;
 
-                    this.x += this.dirX * this.speed;
-                    this.y += this.dirY * this.speed;
-
-                    // Update frame based on horizontal direction
-                    if (this.dirX < 0) {
+                    // Update frame based on movement direction
+                    if (this.moveDirection < 0) {
                         this.facingRight = false;
                         this.currentFrame = 0; // Top frame for left movement
-                    } else if (this.dirX > 0) {
+                    } else {
                         this.facingRight = true;
                         this.currentFrame = 1; // Bottom frame for right movement
                     }
-                    // If dirX is 0, keep the current frame
 
-                    // Bounce off walls
-                    if (this.x < 0 || this.x > canvas.width - this.width) {
-                        this.dirX *= -1;
-                        this.x = Math.max(0, Math.min(canvas.width - this.width, this.x));
+                    // Random jumping
+                    this.jumpTimer--;
+                    if (this.jumpTimer <= 0 && this.onGround) {
+                        this.velocityY = this.jumpPower;
+                        this.jumpTimer = Math.floor(Math.random() * 120) + 60;
                     }
-                    if (this.y < 0 || this.y > canvas.height - this.height) {
-                        this.dirY *= -1;
-                        this.y = Math.max(0, Math.min(canvas.height - this.height, this.y));
+
+                    // Change direction at edges
+                    if (this.x < 0 || this.x > canvas.width - this.width) {
+                        this.moveDirection *= -1;
                     }
                 }
+
+                // Apply velocity
+                this.x += this.velocityX;
+                this.y += this.velocityY;
+
+                // Reset ground status
+                this.onGround = false;
+
+                // Platform collision detection
+                for (let platform of game.platforms) {
+                    if (this.checkPlatformCollision(platform)) {
+                        // Landing on top of platform
+                        if (this.velocityY > 0 && this.y + this.height - this.velocityY <= platform.y + 5) {
+                            this.y = platform.y - this.height;
+                            this.velocityY = 0;
+                            this.onGround = true;
+                        }
+                        // Hitting bottom of platform
+                        else if (this.velocityY < 0 && this.y - this.velocityY >= platform.y + platform.height) {
+                            this.y = platform.y + platform.height;
+                            this.velocityY = 0;
+                        }
+                        // Side collision
+                        else {
+                            if (this.velocityX > 0) {
+                                this.x = platform.x - this.width;
+                            } else if (this.velocityX < 0) {
+                                this.x = platform.x + platform.width;
+                            }
+                            this.velocityX = 0;
+                            if (!this.isPlayer) {
+                                this.moveDirection *= -1;
+                            }
+                        }
+                    }
+                }
+
+                // Keep in bounds horizontally
+                if (this.x < 0) {
+                    this.x = 0;
+                    if (!this.isPlayer) this.moveDirection = 1;
+                }
+                if (this.x > canvas.width - this.width) {
+                    this.x = canvas.width - this.width;
+                    if (!this.isPlayer) this.moveDirection = -1;
+                }
+
+                // Terminal velocity
+                if (this.velocityY > 15) {
+                    this.velocityY = 15;
+                }
+            }
+
+            checkPlatformCollision(platform) {
+                return this.x < platform.x + platform.width &&
+                       this.x + this.width > platform.x &&
+                       this.y < platform.y + platform.height &&
+                       this.y + this.height > platform.y;
             }
 
             draw() {
@@ -278,11 +358,25 @@
 
         // Initialize game
         function init() {
-            // Create player
-            game.player = new Character('player.png', 400, 300, true);
+            // Create platforms for the platformer level
+            // Ground
+            game.platforms.push(new Platform(0, 550, canvas.width, 50, '#2d5016'));
+
+            // Various platforms at different heights
+            game.platforms.push(new Platform(100, 450, 150, 20, '#8B4513'));
+            game.platforms.push(new Platform(300, 380, 120, 20, '#8B4513'));
+            game.platforms.push(new Platform(500, 320, 150, 20, '#8B4513'));
+            game.platforms.push(new Platform(150, 260, 100, 20, '#8B4513'));
+            game.platforms.push(new Platform(400, 200, 120, 20, '#8B4513'));
+            game.platforms.push(new Platform(650, 450, 130, 20, '#8B4513'));
+            game.platforms.push(new Platform(50, 150, 100, 20, '#8B4513'));
+            game.platforms.push(new Platform(600, 150, 150, 20, '#8B4513'));
+
+            // Create player on the ground
+            game.player = new Character('player.png', 100, 480, true);
             game.characters.push(game.player);
 
-            // Create NPCs with different sprites
+            // Create NPCs with different sprites on various platforms
             const npcSprites = [
                 'npc1.png',
                 'npc2.png',
@@ -300,15 +394,23 @@
                 'generatorgusen.png'
             ];
 
-            // Create NPCs at random positions
-            for (let i = 0; i < 8; i++) {
+            // Place NPCs on different platforms
+            const npcPositions = [
+                { x: 120, y: 380 },  // On first platform
+                { x: 320, y: 310 },  // On second platform
+                { x: 520, y: 250 },  // On third platform
+                { x: 170, y: 190 },  // On fourth platform
+                { x: 420, y: 130 },  // On fifth platform
+                { x: 670, y: 380 },  // On sixth platform
+            ];
+
+            for (let i = 0; i < 6; i++) {
                 const sprite = npcSprites[i % npcSprites.length];
-                const x = Math.random() * (canvas.width - 100);
-                const y = Math.random() * (canvas.height - 100);
-                game.characters.push(new Character(sprite, x, y, false));
+                const pos = npcPositions[i];
+                game.characters.push(new Character(sprite, pos.x, pos.y, false));
             }
 
-            console.log(`Game initialized with ${game.characters.length} characters`);
+            console.log(`Platformer initialized with ${game.characters.length} characters and ${game.platforms.length} platforms`);
             console.log(`Loading ${game.totalAssets} assets...`);
         }
 
@@ -332,17 +434,26 @@
                 return;
             }
 
-            // Draw ground/grass pattern
-            ctx.fillStyle = '#90ee90';
-            for (let i = 0; i < canvas.width; i += 40) {
-                for (let j = 0; j < canvas.height; j += 40) {
-                    if ((i + j) % 80 === 0) {
-                        ctx.fillRect(i, j, 40, 40);
-                    }
-                }
-            }
+            // Draw clouds
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.beginPath();
+            ctx.arc(100, 80, 30, 0, Math.PI * 2);
+            ctx.arc(130, 80, 40, 0, Math.PI * 2);
+            ctx.arc(160, 80, 30, 0, Math.PI * 2);
+            ctx.fill();
 
-            // Update and draw all characters
+            ctx.beginPath();
+            ctx.arc(500, 120, 35, 0, Math.PI * 2);
+            ctx.arc(535, 120, 45, 0, Math.PI * 2);
+            ctx.arc(575, 120, 35, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Draw platforms
+            game.platforms.forEach(platform => {
+                platform.draw();
+            });
+
+            // Update all characters
             game.characters.forEach(char => {
                 char.update();
             });

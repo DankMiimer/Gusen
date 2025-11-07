@@ -79,10 +79,12 @@
                 jump/wall jump,
                 <span class="key">↓</span>
                 <span class="key">S</span>
-                stomp attack
+                stomp,
+                <span class="key">X</span>
+                sword
             </div>
             <div class="info">
-                <strong>Goal:</strong> Collect coins & gems, reach checkpoints, stomp enemies!
+                <strong>Goal:</strong> Collect coins & gems, slash enemies with your sword!
             </div>
             <div class="info" id="score">Score: 0</div>
         </div>
@@ -641,7 +643,17 @@
                 this.size = Math.random() * 4 + 2;
                 this.color = type === 'dust' ? '#aaa' :
                             type === 'sparkle' ? '#f4d03f' :
-                            type === 'damage' ? '#ff0000' : '#fff';
+                            type === 'damage' ? '#ff0000' :
+                            type === 'blood' ? '#8b0000' : '#fff';
+
+                // Blood particles have different physics
+                if (type === 'blood') {
+                    this.velocityX = (Math.random() - 0.5) * 6;
+                    this.velocityY = (Math.random() - 0.5) * 6;
+                    this.size = Math.random() * 6 + 3;
+                    this.life = 40;
+                    this.maxLife = 40;
+                }
             }
 
             update() {
@@ -735,6 +747,23 @@
                     this.jumpPressed = false; // For preventing held key issues
                     this.canWallJump = true;
                     this.stompVelocity = -12;
+
+                    // Sword attack properties
+                    this.hasSword = true;
+                    this.swordAttacking = false;
+                    this.swordAttackDuration = 20; // frames
+                    this.swordAttackTimer = 0;
+                    this.swordRange = 80;
+                    this.swordWidth = 60;
+                    this.swordHeight = 60;
+                    this.swordImage = new Image();
+                    this.swordImage.src = 'sword.png';
+                    this.swordLoaded = false;
+                    this.swordImage.onload = () => {
+                        this.swordLoaded = true;
+                        this.swordFrameHeight = this.swordImage.height / 2;
+                        this.swordFrameWidth = this.swordImage.width;
+                    };
                 }
 
                 // NPC-specific properties
@@ -884,6 +913,23 @@
                     this.isStomping = true;
                 } else {
                     this.isStomping = false;
+                }
+
+                // Sword attack - X key
+                if (game.keys['x'] || game.keys['X']) {
+                    if (!this.swordAttacking && this.swordAttackTimer <= 0) {
+                        this.swordAttacking = true;
+                        this.swordAttackTimer = this.swordAttackDuration;
+                        playSound('collect'); // Sword swing sound
+                    }
+                }
+
+                // Update sword attack timer
+                if (this.swordAttackTimer > 0) {
+                    this.swordAttackTimer--;
+                    if (this.swordAttackTimer <= 0) {
+                        this.swordAttacking = false;
+                    }
                 }
 
                 if (this.wallJumpTimer > 0) this.wallJumpTimer--;
@@ -1051,6 +1097,53 @@
                     this.height
                 );
 
+                // Draw sword if player is attacking
+                if (this.isPlayer && this.swordAttacking && this.swordLoaded) {
+                    ctx.save();
+
+                    // Determine sword position based on facing direction
+                    const swordOffsetX = this.facingRight ? this.width : -this.swordWidth;
+                    const swordOffsetY = this.height / 2 - this.swordHeight / 2;
+                    const swordX = screenX + swordOffsetX;
+                    const swordY = screenY + swordOffsetY;
+
+                    // Glow effect - frame 1 is glowing version
+                    const glowProgress = this.swordAttackTimer / this.swordAttackDuration;
+                    const swordFrame = glowProgress > 0.5 ? 1 : 0; // Glow in first half of attack
+
+                    if (this.facingRight) {
+                        // Draw sword normally
+                        ctx.drawImage(
+                            this.swordImage,
+                            0,
+                            swordFrame * this.swordFrameHeight,
+                            this.swordFrameWidth,
+                            this.swordFrameHeight,
+                            Math.floor(swordX),
+                            Math.floor(swordY),
+                            this.swordWidth,
+                            this.swordHeight
+                        );
+                    } else {
+                        // Mirror sword for left-facing
+                        ctx.translate(Math.floor(swordX + this.swordWidth / 2), Math.floor(swordY + this.swordHeight / 2));
+                        ctx.scale(-1, 1);
+                        ctx.drawImage(
+                            this.swordImage,
+                            0,
+                            swordFrame * this.swordFrameHeight,
+                            this.swordFrameWidth,
+                            this.swordFrameHeight,
+                            -this.swordWidth / 2,
+                            -this.swordHeight / 2,
+                            this.swordWidth,
+                            this.swordHeight
+                        );
+                    }
+
+                    ctx.restore();
+                }
+
                 // Player name tag - Pixel art style
                 if (this.isPlayer) {
                     ctx.globalAlpha = 1.0;
@@ -1068,6 +1161,22 @@
                 }
 
                 ctx.restore();
+            }
+
+            getSwordHitbox() {
+                if (!this.swordAttacking) return null;
+
+                const swordX = this.facingRight ?
+                    this.x + this.width :
+                    this.x - this.swordRange;
+                const swordY = this.y + this.height / 2 - this.swordHeight / 2;
+
+                return {
+                    x: swordX,
+                    y: swordY,
+                    width: this.swordRange,
+                    height: this.swordHeight
+                };
             }
 
             checkCollision(other) {
@@ -1748,10 +1857,34 @@
                         }
                     }
 
+                    // Sword attack collision
+                    const swordHitbox = game.player.getSwordHitbox();
+                    if (swordHitbox) {
+                        game.characters.forEach(char => {
+                            if (!char.isPlayer && char.loaded && char.y > -500) { // Don't hit already defeated enemies
+                                // Check if sword hitbox overlaps with enemy
+                                if (swordHitbox.x < char.x + char.width &&
+                                    swordHitbox.x + swordHitbox.width > char.x &&
+                                    swordHitbox.y < char.y + char.height &&
+                                    swordHitbox.y + swordHitbox.height > char.y) {
+                                    // Hit enemy with sword
+                                    char.y = -1000; // Move off screen
+                                    game.score += 75; // More points for sword kill
+
+                                    // Create blood splatter particles
+                                    for (let i = 0; i < 20; i++) {
+                                        game.particles.push(new Particle(char.x + char.width / 2, char.y + char.height / 2, 'blood'));
+                                    }
+                                    playSound('damage'); // Sword hit sound
+                                }
+                            }
+                        });
+                    }
+
                     // Enemy collision / stomp attack
                     if (game.invincibilityTimer === 0) {
                         game.characters.forEach(char => {
-                            if (!char.isPlayer && char.loaded && game.player.checkCollision(char)) {
+                            if (!char.isPlayer && char.loaded && char.y > -500 && game.player.checkCollision(char)) {
                                 // Stomp attack - if player is above enemy and falling
                                 if (game.player.isStomping && game.player.y + game.player.height / 2 < char.y) {
                                     // Remove enemy

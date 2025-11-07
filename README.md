@@ -12,10 +12,49 @@ A fun 2D character animation game using sprite-based characters with 2-frame ani
 
 ## How to Play
 
-1. Open `game.html` in your web browser
-2. Use **Arrow Keys** (↑↓←→) or **WASD** to move your character
-3. Explore the world and interact with NPCs to earn points
-4. Try to meet all the different characters!
+### Quick Start (Recommended)
+
+**Option 1: Use the Start Script**
+
+Linux/Mac:
+```bash
+./start-game.sh
+```
+
+Windows:
+```cmd
+start-game.bat
+```
+
+Then open your browser and go to: `http://localhost:8000/game.html`
+
+**Option 2: Using Python directly**
+
+```bash
+# Python 3
+python3 -m http.server 8000
+
+# Or Python 2
+python -m SimpleHTTPServer 8000
+```
+
+Then open: `http://localhost:8000/game.html`
+
+**Option 3: Using Node.js**
+
+```bash
+npx http-server -p 8000
+```
+
+Then open: `http://localhost:8000/game.html`
+
+> **Note:** Opening `game.html` directly (file://) won't work due to browser security restrictions (CORS). You must use a local web server.
+
+### Game Controls
+
+1. Use **Arrow Keys** (↑↓←→) or **WASD** to move your character
+2. Explore the world and interact with NPCs to earn points
+3. Try to meet all the different characters!
 
 ## Character Sprites
 

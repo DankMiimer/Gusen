@@ -367,17 +367,17 @@ class Character:
         self.vx = 0
 
         # Movement
-        if keys[pygame.K_LEFT] or keys[pygame.K_a]:
+        if keys.get(pygame.K_LEFT, False) or keys.get(pygame.K_a, False):
             self.vx = -PLAYER_SPEED
             self.facing_right = False
             self.current_frame = 0
-        if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+        if keys.get(pygame.K_RIGHT, False) or keys.get(pygame.K_d, False):
             self.vx = PLAYER_SPEED
             self.facing_right = True
             self.current_frame = 1
 
         # Jumping
-        jump_key = keys[pygame.K_UP] or keys[pygame.K_w] or keys[pygame.K_SPACE]
+        jump_key = keys.get(pygame.K_UP, False) or keys.get(pygame.K_w, False) or keys.get(pygame.K_SPACE, False)
         if jump_key and self.jump_count < 2:
             if not self.jump_pressed:
                 self.vy = PLAYER_JUMP_POWER
@@ -389,14 +389,14 @@ class Character:
             self.jump_pressed = False
 
         # Stomp
-        if self.vy > 0 and (keys[pygame.K_DOWN] or keys[pygame.K_s]):
+        if self.vy > 0 and (keys.get(pygame.K_DOWN, False) or keys.get(pygame.K_s, False)):
             self.vy = max(self.vy, 15)
             self.is_stomping = True
         else:
             self.is_stomping = False
 
         # Sword attack
-        if keys[pygame.K_x]:
+        if keys.get(pygame.K_x, False) or keys.get(pygame.K_X, False):
             if not self.sword_attacking and self.sword_cooldown_timer <= 0:
                 self.sword_attacking = True
                 self.sword_attack_timer = self.sword_attack_duration

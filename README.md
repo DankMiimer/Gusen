@@ -2,6 +2,47 @@
 
 A fun 2D sidescrolling platformer with sprite-based characters, smooth camera following, forest environment, and 2-frame directional animations!
 
+**Now available in two versions:**
+- 🌐 **HTML5 Version** - Browser-based game (original)
+- 🎮 **Native PyGame Version** - Optimized for Anbernic RG34XXSP and other handheld devices!
+
+## 🎮 Native PyGame Version (NEW!)
+
+The game is now available as a native PyGame application, optimized for the **Anbernic RG34XXSP** running **Knulli (Gladiator 2)**!
+
+### Features
+- ✅ Native gamepad support for Anbernic RG34XXSP
+- ✅ Optimized for 3:2 aspect ratio (640x480)
+- ✅ 60 FPS smooth gameplay
+- ✅ All combat mechanics (sword, stomp, double jump)
+- ✅ Multiple enemy types and platform styles
+- ✅ Full particle effects and animations
+
+### Quick Start (Anbernic/Handheld)
+
+1. Install Python 3 and PyGame on your device
+2. Copy all game files to `/roms/ports/Gusen/`
+3. Run the launcher:
+```bash
+./launch.sh
+```
+
+Or run directly:
+```bash
+python3 gusen_game.py
+```
+
+**📖 See [INSTALL_ANBERNIC.md](INSTALL_ANBERNIC.md) for detailed installation instructions!**
+
+### Gamepad Controls (Anbernic RG34XXSP)
+- **D-Pad**: Movement
+- **A Button**: Jump (double jump available)
+- **B Button**: Sword Attack
+- **D-Pad Down** (while jumping): Stomp Attack
+- **Start**: Quit Game
+
+## 🌐 HTML5 Browser Version
+
 ## Features
 
 - **Extended Sidescrolling World**: Massive 6400px world to explore with smooth camera following

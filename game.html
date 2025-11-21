@@ -238,8 +238,45 @@
                 shield: 0
             },
             timer: 0,
-            timerRunning: false
+            timerRunning: false,
+            platformTextures: {
+                grass: null,
+                left: null,
+                middle: null,
+                right: null
+            }
         };
+
+        // ===== LOAD PLATFORM TEXTURES =====
+        function loadPlatformTextures() {
+            const textures = [
+                { name: 'grass', src: 'Terreng_Gress.png' },
+                { name: 'left', src: 'Left_Grass_Platform.png' },
+                { name: 'middle', src: 'Middle_Grass_Platform.png' },
+                { name: 'right', src: 'Right_Grass_Platform.png' }
+            ];
+
+            textures.forEach(tex => {
+                const img = new Image();
+                img.src = tex.src;
+                game.totalAssets++;
+                img.onload = () => {
+                    game.platformTextures[tex.name] = img;
+                    game.assetsLoaded++;
+                    if (game.assetsLoaded === game.totalAssets) {
+                        game.gameStarted = true;
+                        console.log('All assets loaded!');
+                    }
+                };
+                img.onerror = () => {
+                    console.error(`Failed to load platform texture: ${tex.src}`);
+                    game.assetsLoaded++;
+                    if (game.assetsLoaded === game.totalAssets) {
+                        game.gameStarted = true;
+                    }
+                };
+            });
+        }
 
         // ===== PLATFORM CLASS =====
         class Platform {
@@ -289,8 +326,36 @@
                     return;
                 }
 
-                // Mossy grass tile rendering for ground platforms
-                if (this.isGround) {
+                // Textured grass tile rendering for ground platforms using Terreng_Gress.png
+                if (this.isGround && game.platformTextures.grass) {
+                    const texture = game.platformTextures.grass;
+                    const tileWidth = texture.width;
+                    const tileHeight = texture.height;
+
+                    // Calculate how many tiles we need to cover the platform
+                    const numTiles = Math.ceil(this.width / tileWidth);
+
+                    for (let i = 0; i < numTiles; i++) {
+                        const tileX = screenX + i * tileWidth;
+                        const drawWidth = Math.min(tileWidth, this.width - i * tileWidth);
+
+                        // Draw the texture tile, repeating it across the platform
+                        ctx.drawImage(
+                            texture,
+                            0, 0, drawWidth, Math.min(tileHeight, this.height),
+                            Math.floor(tileX), Math.floor(screenY),
+                            drawWidth, Math.min(tileHeight, this.height)
+                        );
+
+                        // If the platform is taller than the texture, fill the rest with the bottom part
+                        if (this.height > tileHeight) {
+                            ctx.fillStyle = '#3a5a2a'; // Dark dirt color for extension
+                            ctx.fillRect(Math.floor(tileX), Math.floor(screenY + tileHeight), drawWidth, this.height - tileHeight);
+                        }
+                    }
+                    return;
+                } else if (this.isGround) {
+                    // Fallback to procedural rendering if texture not loaded
                     const tileSize = 16;
                     const numTiles = Math.ceil(this.width / tileSize);
 
@@ -1327,28 +1392,45 @@
                 ]
             ],
             npcPositions: [
-                // Section 1-2: Start area
-                { x: 600, y: 410 }, { x: 900, y: 410 }, { x: 1250, y: 320 },
-                // Section 3: Crystal
-                { x: 1700, y: 390 }, { x: 2000, y: 310 },
-                // Section 4: Tower
-                { x: 2350, y: 210 }, { x: 2650, y: 170 },
-                // Section 5: Mixed
-                { x: 3050, y: 350 }, { x: 3350, y: 300 },
-                // Section 6: Sky
-                { x: 3800, y: 350 }, { x: 4150, y: 110 },
-                // Section 7: Industrial
-                { x: 4500, y: 290 }, { x: 4800, y: 370 },
-                // Section 8: Crystal Paradise
-                { x: 5150, y: 350 }, { x: 5450, y: 210 },
-                // Section 9: Final
-                { x: 5800, y: 350 }
+                // Section 1-2: Start area - Many more sprites!
+                { x: 300, y: 480 }, { x: 600, y: 410 }, { x: 750, y: 480 },
+                { x: 900, y: 410 }, { x: 1050, y: 480 }, { x: 1250, y: 320 },
+                { x: 150, y: 480 }, { x: 450, y: 300 }, { x: 850, y: 380 },
+                // Section 3: Crystal - More enemies
+                { x: 1700, y: 390 }, { x: 1850, y: 280 }, { x: 2000, y: 310 },
+                { x: 1600, y: 480 }, { x: 1950, y: 480 }, { x: 1780, y: 360 },
+                // Section 4: Tower - Challenging climb
+                { x: 2350, y: 210 }, { x: 2420, y: 360 }, { x: 2650, y: 170 },
+                { x: 2300, y: 420 }, { x: 2550, y: 0 }, { x: 2800, y: 180 },
+                { x: 2250, y: 480 }, { x: 2480, y: 480 },
+                // Section 5: Mixed - Scattered enemies
+                { x: 3050, y: 350 }, { x: 3200, y: 480 }, { x: 3350, y: 300 },
+                { x: 3100, y: 480 }, { x: 3450, y: 320 }, { x: 3300, y: 260 },
+                // Section 6: Sky - Flying and ground enemies
+                { x: 3800, y: 350 }, { x: 3950, y: 300 }, { x: 4150, y: 110 },
+                { x: 3700, y: 420 }, { x: 4000, y: 250 }, { x: 4300, y: 120 },
+                { x: 3750, y: 480 }, { x: 4100, y: 480 },
+                // Section 7: Industrial - Heavy resistance
+                { x: 4500, y: 290 }, { x: 4650, y: 320 }, { x: 4800, y: 370 },
+                { x: 4450, y: 480 }, { x: 4920, y: 240 }, { x: 4350, y: 260 },
+                { x: 4700, y: 480 }, { x: 4600, y: 280 },
+                // Section 8: Crystal Paradise - Beautiful but dangerous
+                { x: 5150, y: 350 }, { x: 5300, y: 300 }, { x: 5450, y: 210 },
+                { x: 5100, y: 420 }, { x: 5350, y: 480 }, { x: 5250, y: 260 },
+                { x: 5500, y: 480 }, { x: 5400, y: 340 },
+                // Section 9: Final - Epic gauntlet!
+                { x: 5800, y: 350 }, { x: 5900, y: 360 }, { x: 6050, y: 300 },
+                { x: 5750, y: 420 }, { x: 6150, y: 220 }, { x: 6250, y: 480 },
+                { x: 5850, y: 480 }, { x: 6100, y: 480 }, { x: 6200, y: 240 }
             ]
         };
 
         // ===== GAME INITIALIZATION =====
         function init() {
-            // Create ground platforms with mossy grass tiles
+            // Load platform textures
+            loadPlatformTextures();
+
+            // Create ground platforms with textured grass tiles
             LEVEL_DATA.groundPlatforms.forEach(p => {
                 game.platforms.push(new Platform(p.x, p.y, p.w, 50, CONFIG.colors.ground, true, false, 'ground'));
             });

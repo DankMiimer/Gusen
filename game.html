@@ -238,7 +238,14 @@
                 shield: 0
             },
             timer: 0,
-            timerRunning: false
+            timerRunning: false,
+            // Platform sprite images
+            platformSprites: {
+                left: null,
+                middle: null,
+                right: null,
+                loaded: false
+            }
         };
 
         // ===== PLATFORM CLASS =====
@@ -289,7 +296,43 @@
                     return;
                 }
 
-                // Mossy grass tile rendering for ground platforms
+                // Grass sprite tile rendering for ground platforms
+                if (this.isGround && game.platformSprites.loaded) {
+                    const leftSprite = game.platformSprites.left;
+                    const middleSprite = game.platformSprites.middle;
+                    const rightSprite = game.platformSprites.right;
+
+                    const tileWidth = middleSprite.width;
+                    const tileHeight = this.height;
+                    const numMiddleTiles = Math.max(0, Math.floor((this.width - leftSprite.width - rightSprite.width) / tileWidth));
+
+                    // Draw left edge
+                    ctx.drawImage(leftSprite,
+                        Math.floor(screenX),
+                        Math.floor(screenY),
+                        leftSprite.width,
+                        tileHeight);
+
+                    // Draw middle tiles
+                    for (let i = 0; i < numMiddleTiles; i++) {
+                        ctx.drawImage(middleSprite,
+                            Math.floor(screenX + leftSprite.width + i * tileWidth),
+                            Math.floor(screenY),
+                            tileWidth,
+                            tileHeight);
+                    }
+
+                    // Draw right edge
+                    ctx.drawImage(rightSprite,
+                        Math.floor(screenX + this.width - rightSprite.width),
+                        Math.floor(screenY),
+                        rightSprite.width,
+                        tileHeight);
+
+                    return;
+                }
+
+                // Fallback: Mossy grass tile rendering if sprites not loaded
                 if (this.isGround) {
                     const tileSize = 16;
                     const numTiles = Math.ceil(this.width / tileSize);
@@ -1348,6 +1391,34 @@
 
         // ===== GAME INITIALIZATION =====
         function init() {
+            // Load platform sprites
+            game.platformSprites.left = new Image();
+            game.platformSprites.middle = new Image();
+            game.platformSprites.right = new Image();
+
+            let spritesLoaded = 0;
+            const totalSprites = 3;
+
+            const onSpriteLoad = () => {
+                spritesLoaded++;
+                if (spritesLoaded === totalSprites) {
+                    game.platformSprites.loaded = true;
+                    console.log('Platform sprites loaded successfully!');
+                }
+            };
+
+            game.platformSprites.left.onload = onSpriteLoad;
+            game.platformSprites.middle.onload = onSpriteLoad;
+            game.platformSprites.right.onload = onSpriteLoad;
+
+            game.platformSprites.left.onerror = () => console.error('Failed to load Left_Grass_Platform.png');
+            game.platformSprites.middle.onerror = () => console.error('Failed to load Middle_Grass_Platform.png');
+            game.platformSprites.right.onerror = () => console.error('Failed to load Right_Grass_Platform.png');
+
+            game.platformSprites.left.src = 'Left_Grass_Platform.png';
+            game.platformSprites.middle.src = 'Middle_Grass_Platform.png';
+            game.platformSprites.right.src = 'Right_Grass_Platform.png';
+
             // Create ground platforms with mossy grass tiles
             LEVEL_DATA.groundPlatforms.forEach(p => {
                 game.platforms.push(new Platform(p.x, p.y, p.w, 50, CONFIG.colors.ground, true, false, 'ground'));

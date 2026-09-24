@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python tools/run_tests.py:*)",
+      "Bash(python3 tools/run_tests.py:*)",
+      "Bash(python tools/make_assets.py)",
+      "Bash(python3 tools/make_assets.py)",
+      "Bash(python tools/package_port.py)",
+      "Bash(python3 tools/package_port.py)",
+      "Bash(python tools/deploy.py --log)",
+      "Bash(python3 tools/deploy.py --log)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)"
+    ]
+  }
+}

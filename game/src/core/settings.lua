@@ -24,6 +24,11 @@ end
 
 function settings.load()
     settings.data = copy(DEFAULTS)
+    if os.getenv("GUSEN_AUTOTEST") then
+        -- tests always start from a fresh first boot and never touch the player's settings
+        settings.file = "autotest_settings.lua"
+        love.filesystem.remove(settings.file)
+    end
     if love.filesystem.getInfo(settings.file) then
         local ok, chunk = pcall(love.filesystem.load, settings.file)
         if ok and chunk then

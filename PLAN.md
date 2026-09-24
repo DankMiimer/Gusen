@@ -382,13 +382,13 @@ tools/                make_assets.py, package_port.py
 
 ### Testing: PC first, then the RG34XXSP
 
-1. **Automated (every change):** `GUSEN_AUTOTEST=tour love game` plays through
-   title → village → talking → inn → cave slide → pause (language switch) →
-   forest, checks 8 things and saves screenshots. It also runs in OpenGL ES
-   mode, and through `port/Gusen.sh` against a stand-in PortMaster to check
-   the launcher.
+1. **Automated (every change):** `python tools/run_tests.py` (and `--gles`)
+   runs `game/tests/`. `tour` plays through title → village → talking → inn →
+   cave slide → pause (language switch) → forest, checks 8 things and saves
+   screenshots to `test-output/`. `port/Gusen.sh` was also run against a
+   stand-in PortMaster to check the launcher.
 2. **You on PC:** `Test on PC.bat` (needs LÖVE 11.5 for Windows).
-3. **You on the RG34XXSP:** `Install to RG34XXSP.bat` copies the port to
+3. **You on the RG34XXSP:** `Install to RG34XXSP.bat` (or `python tools/deploy.py`) copies the port to
    `\\GAMEBOY\share\roms\ports`; start *Gusen* from Ports.
 
 ---

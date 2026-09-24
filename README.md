@@ -53,15 +53,20 @@ doesn't start, `roms/ports/gusen/log.txt` says why.
 
 ## For development
 
+Coding agents / LLM sessions: start with **[AGENTS.md](AGENTS.md)** and
+**[docs/HANDOFF.md](docs/HANDOFF.md)**. Claude Code also loads `CLAUDE.md`
+and the skills in `.claude/skills/`.
+
+Setup: Python 3.8+ with `pip install -r requirements.txt`, and LÖVE 11.5.
+(`python` on Windows, `python3` elsewhere.)
+
 | Task | Command |
 |---|---|
-| Rebuild all art (1x PNGs, `.ase` copies, manifest, previews) | `python3 tools/make_assets.py` (needs Pillow) |
-| Scripted play-through with checks + screenshots | `GUSEN_AUTOTEST=tour love game` |
-| Same, the way the handheld's GPU renders (OpenGL ES) | `LOVE_GRAPHICS_USE_OPENGLES=1 GUSEN_AUTOTEST=tour love game` |
-| Build the PortMaster package | `python3 tools/package_port.py` → `dist/` |
-
-Screenshots from tests land in LÖVE's save folder (`%APPDATA%\LOVE\gusen` on
-Windows, `~/.local/share/love/gusen` on Linux).
+| Rebuild all art (1x PNGs, `.ase` copies, manifest, previews) | `python tools/make_assets.py` |
+| All scripted tests (checks + screenshots in `test-output/`) | `python tools/run_tests.py` |
+| Same, rendered the way the handheld's GPU does (OpenGL ES) | `python tools/run_tests.py --gles` |
+| Copy to the RG34XXSP / read its log | `python tools/deploy.py` / `python tools/deploy.py --log` |
+| Build the PortMaster package | `python tools/package_port.py` → `dist/` |
 
 `Gusen.sh` must keep LF line endings. `.gitattributes` takes care of that, even
 on Windows.
@@ -73,6 +78,7 @@ game/      the LÖVE game (becomes roms/ports/gusen/gamedata on the handheld)
 port/      PortMaster launcher + port files
 tools/     art generator, packaging
 art/ase/   editable Aseprite copies of the generated sprites
-docs/      art guide, mockups, screenshots
+docs/      art guide, handoff notes, mockups, screenshots
+AGENTS.md CLAUDE.md .claude/   instructions and skills for coding agents
 *.ase *.png (top level)   your original art: the generator reads these
 ```

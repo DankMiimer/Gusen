@@ -1,5 +1,10 @@
 # Gusen Platformer Game 🎮
 
+> **Rebuild in progress:** Gusen is being remade as a top-down GBA-style
+> adventure (240×160). See **[PLAN.md](PLAN.md)** for the analysis and roadmap,
+> and **[assets/README.md](assets/README.md)** for the pixel-art style guide and
+> the new assets. The platformer below (`game.html`) is the old version.
+
 A fun 2D sidescrolling platformer with sprite-based characters, smooth camera following, forest environment, and 2-frame directional animations!
 
 ## Features

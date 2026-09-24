@@ -1,0 +1,12 @@
+# The launcher runs on Linux (the handheld): it must keep LF line endings even
+# when the repo is checked out on Windows.
+*.sh   text eol=lf
+*.lua  text eol=lf
+*.json text eol=lf
+*.md   text eol=lf
+# Windows batch files need CRLF
+*.bat  text eol=crlf
+# binary art
+*.png  binary
+*.ase  binary
+*.jpg  binary

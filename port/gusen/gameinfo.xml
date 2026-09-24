@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<gameList>
+  <game>
+    <path>./Gusen.sh</path>
+    <name>Gusen</name>
+    <desc>A small top-down adventure in the style of a GBA game. The candles in Gusenby are going out one by one.</desc>
+    <developer>DankMiimer</developer>
+    <publisher>DankMiimer</publisher>
+    <genre>Action-Adventure</genre>
+    <image>./gusen/screenshot.png</image>
+  </game>
+</gameList>

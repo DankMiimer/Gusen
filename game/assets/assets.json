@@ -1358,13 +1358,13 @@
    "file": "tiles/interior.png",
    "size": [
     256,
-    16
+    32
    ],
    "frame": [
     16,
     16
    ],
-   "frames": 16,
+   "frames": 32,
    "note": "side/front pieces are drawn on floor_planks; use art_tiles.interior_tiles() overlays for other floors",
    "tiles": {
     "floor_planks": 0,
@@ -1381,7 +1381,12 @@
     "front_l": 11,
     "front": 12,
     "front_r": 13,
-    "void": 14
+    "void": 14,
+    "cap_side_l": 16,
+    "cap_side_r": 17,
+    "cap_front": 18,
+    "cap_front_l": 19,
+    "cap_front_r": 20
    }
   },
   "font": {
@@ -1478,6 +1483,656 @@
     62,
     20
    ]
+  },
+  "candle": {
+   "file": "legacy/candle.png",
+   "size": [
+    48,
+    15
+   ],
+   "frame": [
+    12,
+    15
+   ],
+   "frames": 4,
+   "origin": [
+    6,
+    14
+   ],
+   "animations": {
+    "blow_out": {
+     "frames": [
+      0,
+      1,
+      2,
+      3
+     ],
+     "ms": [
+      500,
+      500,
+      500,
+      500
+     ],
+     "loop": false
+    }
+   },
+   "note": "exported from Blåse ut lys_12x15.ase"
+  },
+  "frog": {
+   "file": "legacy/frog.png",
+   "size": [
+    36,
+    15
+   ],
+   "frame": [
+    12,
+    15
+   ],
+   "frames": 3,
+   "origin": [
+    6,
+    14
+   ],
+   "animations": {
+    "bounce": {
+     "frames": [
+      0,
+      1,
+      2
+     ],
+     "ms": [
+      300,
+      150,
+      300
+     ],
+     "loop": true
+    }
+   },
+   "note": "exported from Bouncy Ball Frog_12x15.ase"
+  },
+  "fluesopp": {
+   "file": "legacy/fluesopp.png",
+   "size": [
+    24,
+    15
+   ],
+   "frame": [
+    12,
+    15
+   ],
+   "frames": 2,
+   "origin": [
+    6,
+    14
+   ],
+   "animations": {
+    "idle": {
+     "frames": [
+      0,
+      1
+     ],
+     "ms": [
+      500,
+      500
+     ],
+     "loop": true
+    }
+   },
+   "note": "exported from Fluesopp med sporer_12x15.ase"
+  },
+  "coin": {
+   "file": "legacy/coin.png",
+   "size": [
+    36,
+    15
+   ],
+   "frame": [
+    12,
+    15
+   ],
+   "frames": 3,
+   "origin": [
+    6,
+    14
+   ],
+   "animations": {
+    "spin": {
+     "frames": [
+      0,
+      1,
+      2
+     ],
+     "ms": [
+      200,
+      200,
+      200
+     ],
+     "loop": true
+    }
+   },
+   "note": "exported from Penge_12x15.ase"
+  },
+  "microwave": {
+   "file": "legacy/microwave.png",
+   "size": [
+    36,
+    15
+   ],
+   "frame": [
+    12,
+    15
+   ],
+   "frames": 3,
+   "origin": [
+    6,
+    14
+   ],
+   "animations": {
+    "explode": {
+     "frames": [
+      0,
+      1,
+      2
+     ],
+     "ms": [
+      500,
+      100,
+      300
+     ],
+     "loop": false
+    }
+   },
+   "note": "exported from Eksploderende Mikrobølgeovn_12x15.ase"
+  },
+  "windgrass": {
+   "file": "legacy/windgrass.png",
+   "size": [
+    24,
+    15
+   ],
+   "frame": [
+    12,
+    15
+   ],
+   "frames": 2,
+   "origin": [
+    6,
+    14
+   ],
+   "animations": {
+    "sway": {
+     "frames": [
+      0,
+      1
+     ],
+     "ms": [
+      500,
+      500
+     ],
+     "loop": true
+    }
+   },
+   "note": "exported from Vind i gress_12x15.ase"
+  },
+  "flower_grow": {
+   "file": "legacy/flower_grow.png",
+   "size": [
+    224,
+    32
+   ],
+   "frame": [
+    32,
+    32
+   ],
+   "frames": 7,
+   "origin": [
+    16,
+    31
+   ],
+   "animations": {
+    "grow": {
+     "frames": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+     ],
+     "ms": [
+      1000,
+      1000,
+      1000,
+      1000,
+      1000,
+      1000,
+      1000
+     ],
+     "loop": false
+    }
+   },
+   "note": "exported from Voksende rød blomst_32x32.ase"
+  },
+  "player": {
+   "file": "legacy/player.png",
+   "size": [
+    12,
+    30
+   ],
+   "frame": [
+    12,
+    15
+   ],
+   "frames": 2,
+   "origin": [
+    6,
+    14
+   ],
+   "animations": {
+    "left": {
+     "frames": [
+      0
+     ],
+     "ms": 0
+    },
+    "right": {
+     "frames": [
+      1
+     ],
+     "ms": 0
+    }
+   }
+  },
+  "npc1": {
+   "file": "legacy/npc1.png",
+   "size": [
+    12,
+    30
+   ],
+   "frame": [
+    12,
+    15
+   ],
+   "frames": 2,
+   "origin": [
+    6,
+    14
+   ],
+   "animations": {
+    "left": {
+     "frames": [
+      0
+     ],
+     "ms": 0
+    },
+    "right": {
+     "frames": [
+      1
+     ],
+     "ms": 0
+    }
+   }
+  },
+  "npc2": {
+   "file": "legacy/npc2.png",
+   "size": [
+    12,
+    30
+   ],
+   "frame": [
+    12,
+    15
+   ],
+   "frames": 2,
+   "origin": [
+    6,
+    14
+   ],
+   "animations": {
+    "left": {
+     "frames": [
+      0
+     ],
+     "ms": 0
+    },
+    "right": {
+     "frames": [
+      1
+     ],
+     "ms": 0
+    }
+   }
+  },
+  "dinggusen": {
+   "file": "legacy/dinggusen.png",
+   "size": [
+    12,
+    30
+   ],
+   "frame": [
+    12,
+    15
+   ],
+   "frames": 2,
+   "origin": [
+    6,
+    14
+   ],
+   "animations": {
+    "left": {
+     "frames": [
+      0
+     ],
+     "ms": 0
+    },
+    "right": {
+     "frames": [
+      1
+     ],
+     "ms": 0
+    }
+   }
+  },
+  "gressgusen": {
+   "file": "legacy/gressgusen.png",
+   "size": [
+    12,
+    30
+   ],
+   "frame": [
+    12,
+    15
+   ],
+   "frames": 2,
+   "origin": [
+    6,
+    14
+   ],
+   "animations": {
+    "left": {
+     "frames": [
+      0
+     ],
+     "ms": 0
+    },
+    "right": {
+     "frames": [
+      1
+     ],
+     "ms": 0
+    }
+   }
+  },
+  "lanternegusen": {
+   "file": "legacy/lanternegusen.png",
+   "size": [
+    12,
+    30
+   ],
+   "frame": [
+    12,
+    15
+   ],
+   "frames": 2,
+   "origin": [
+    6,
+    14
+   ],
+   "animations": {
+    "left": {
+     "frames": [
+      0
+     ],
+     "ms": 0
+    },
+    "right": {
+     "frames": [
+      1
+     ],
+     "ms": 0
+    }
+   }
+  },
+  "lunagusen": {
+   "file": "legacy/lunagusen.png",
+   "size": [
+    12,
+    30
+   ],
+   "frame": [
+    12,
+    15
+   ],
+   "frames": 2,
+   "origin": [
+    6,
+    14
+   ],
+   "animations": {
+    "left": {
+     "frames": [
+      0
+     ],
+     "ms": 0
+    },
+    "right": {
+     "frames": [
+      1
+     ],
+     "ms": 0
+    }
+   }
+  },
+  "spaghettigusen": {
+   "file": "legacy/spaghettigusen.png",
+   "size": [
+    12,
+    30
+   ],
+   "frame": [
+    12,
+    15
+   ],
+   "frames": 2,
+   "origin": [
+    6,
+    14
+   ],
+   "animations": {
+    "left": {
+     "frames": [
+      0
+     ],
+     "ms": 0
+    },
+    "right": {
+     "frames": [
+      1
+     ],
+     "ms": 0
+    }
+   }
+  },
+  "wirelessgusen": {
+   "file": "legacy/wirelessgusen.png",
+   "size": [
+    12,
+    30
+   ],
+   "frame": [
+    12,
+    15
+   ],
+   "frames": 2,
+   "origin": [
+    6,
+    14
+   ],
+   "animations": {
+    "left": {
+     "frames": [
+      0
+     ],
+     "ms": 0
+    },
+    "right": {
+     "frames": [
+      1
+     ],
+     "ms": 0
+    }
+   }
+  },
+  "generatorgusen": {
+   "file": "legacy/generatorgusen.png",
+   "size": [
+    12,
+    30
+   ],
+   "frame": [
+    12,
+    15
+   ],
+   "frames": 2,
+   "origin": [
+    6,
+    14
+   ],
+   "animations": {
+    "left": {
+     "frames": [
+      0
+     ],
+     "ms": 0
+    },
+    "right": {
+     "frames": [
+      1
+     ],
+     "ms": 0
+    }
+   }
+  },
+  "sprite": {
+   "file": "legacy/sprite.png",
+   "size": [
+    12,
+    30
+   ],
+   "frame": [
+    12,
+    15
+   ],
+   "frames": 2,
+   "origin": [
+    6,
+    14
+   ],
+   "animations": {
+    "left": {
+     "frames": [
+      0
+     ],
+     "ms": 0
+    },
+    "right": {
+     "frames": [
+      1
+     ],
+     "ms": 0
+    }
+   }
+  },
+  "sprite2": {
+   "file": "legacy/sprite2.png",
+   "size": [
+    12,
+    30
+   ],
+   "frame": [
+    12,
+    15
+   ],
+   "frames": 2,
+   "origin": [
+    6,
+    14
+   ],
+   "animations": {
+    "left": {
+     "frames": [
+      0
+     ],
+     "ms": 0
+    },
+    "right": {
+     "frames": [
+      1
+     ],
+     "ms": 0
+    }
+   }
+  },
+  "sprite3": {
+   "file": "legacy/sprite3.png",
+   "size": [
+    12,
+    30
+   ],
+   "frame": [
+    12,
+    15
+   ],
+   "frames": 2,
+   "origin": [
+    6,
+    14
+   ],
+   "animations": {
+    "left": {
+     "frames": [
+      0
+     ],
+     "ms": 0
+    },
+    "right": {
+     "frames": [
+      1
+     ],
+     "ms": 0
+    }
+   }
+  },
+  "sprite4": {
+   "file": "legacy/sprite4.png",
+   "size": [
+    12,
+    30
+   ],
+   "frame": [
+    12,
+    15
+   ],
+   "frames": 2,
+   "origin": [
+    6,
+    14
+   ],
+   "animations": {
+    "left": {
+     "frames": [
+      0
+     ],
+     "ms": 0
+    },
+    "right": {
+     "frames": [
+      1
+     ],
+     "ms": 0
+    }
+   }
   }
  },
  "mega_skipped": [

@@ -3,8 +3,9 @@
 
     python3 tools/make_assets.py
 
-Writes 1x pixel-perfect PNGs to assets/, editable .ase files to assets/ase/,
-a manifest (assets/assets.json) and 4x previews + GBA mockups to docs/img/.
+Writes 1x pixel-perfect PNGs to game/assets/ (what the LÖVE game loads),
+editable .ase files to art/ase/, the manifest as game/assets/assets.json and
+game/assets/manifest.lua, and 4x previews + GBA mockups to docs/img/.
 Nothing is ever resampled except by integer nearest-neighbour in previews.
 """
 import json
@@ -15,7 +16,7 @@ import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 sys.path.insert(0, os.path.dirname(__file__))
 
-from PIL import ImageDraw  # noqa: E402
+from PIL import Image, ImageDraw  # noqa: E402
 
 import aseprite  # noqa: E402
 import art_chars  # noqa: E402
@@ -26,7 +27,8 @@ import art_ui  # noqa: E402
 from pixel import AAP64, MASTER, blank, check_palette, colors_used, rgba, sheet  # noqa: E402
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-OUT = os.path.join(ROOT, "assets")
+OUT = os.path.join(ROOT, "game", "assets")
+ASE_OUT = os.path.join(ROOT, "art", "ase")
 DOCS = os.path.join(ROOT, "docs", "img")
 MANIFEST = {"_about": "Frames are numbered left-to-right, top-to-bottom. origin = the pixel "
                       "that sits on the ground / entity position. Render at 240x160 and only "
@@ -74,7 +76,7 @@ def save(rel, im, frame=None, anims=None, origin=None, ase=None, max_colors=15, 
                 frames.append(cells[i])
                 durs.append(a["ms"])
             tags.append((name, start, len(frames) - 1))
-        ase_path = os.path.join(OUT, "ase", os.path.splitext(os.path.basename(rel))[0] + ".ase")
+        ase_path = os.path.join(ASE_OUT, os.path.splitext(os.path.basename(rel))[0] + ".ase")
         os.makedirs(os.path.dirname(ase_path), exist_ok=True)
         aseprite.write(ase_path, frames, durs, tags=tags, palette=MASTER)
     return im
@@ -87,6 +89,62 @@ def four_dir(prefix, cols, per_dir, ms):
         for name, idx in per_dir.items():
             anims[f"{name}_{d}"] = {"frames": [r * cols + i for i in idx], "ms": ms[name]}
     return anims
+
+
+LUA_KEYWORDS = {"and", "break", "do", "else", "elseif", "end", "false", "for", "function", "goto", "if", "in",
+                "local", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while"}
+
+
+def to_lua(v, indent=0):
+    """Serialise JSON-like data as a Lua table literal (the game has no JSON parser)."""
+    pad = " " * indent
+    if isinstance(v, dict):
+        items = []
+        for k, x in v.items():
+            plain = isinstance(k, str) and k.isidentifier() and k.isascii() and k not in LUA_KEYWORDS
+            key = k if plain else "[%s]" % to_lua(k)
+            items.append(f"{pad} {key} = {to_lua(x, indent + 1)}")
+        return "{\n" + ",\n".join(items) + f"\n{pad}}}" if items else "{}"
+    if isinstance(v, (list, tuple)):
+        return "{" + ", ".join(to_lua(x, indent + 1) for x in v) + "}"
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if v is None:
+        return "nil"
+    if isinstance(v, (int, float)):
+        return repr(v)
+    return '"' + str(v).replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n") + '"'
+
+
+# your existing art, exported exactly as the game needs it (sheets, 1x) ---------
+LEGACY_ASE = {
+    # name: (file, animation name, loop)
+    "candle": ("Blåse ut lys_12x15.ase", "blow_out", False),
+    "frog": ("Bouncy Ball Frog_12x15.ase", "bounce", True),
+    "fluesopp": ("Fluesopp med sporer_12x15.ase", "idle", True),
+    "coin": ("Penge_12x15.ase", "spin", True),
+    "microwave": ("Eksploderende Mikrobølgeovn_12x15.ase", "explode", False),
+    "windgrass": ("Vind i gress_12x15.ase", "sway", True),
+    "flower_grow": ("Voksende rød blomst_32x32.ase", "grow", False),
+}
+LEGACY_PNG = ["player", "npc1", "npc2", "dinggusen", "gressgusen", "lanternegusen", "lunagusen",
+              "spaghettigusen", "wirelessgusen", "generatorgusen", "sprite", "sprite2", "sprite3", "sprite4"]
+
+
+def export_legacy():
+    for name, (fname, anim, loop) in LEGACY_ASE.items():
+        a = existing(fname)
+        frames = [f for f, _ in a["frames"]]
+        w, h = frames[0].size
+        save(f"legacy/{name}.png", sheet(frames, len(frames)), frame=(w, h), origin=(w // 2, h - 1),
+             max_colors=None, anims={anim: {"frames": list(range(len(frames))), "ms": [d for _, d in a["frames"]],
+                                            "loop": loop}},
+             note=f"exported from {fname}")
+    for n in LEGACY_PNG:
+        im = Image.open(os.path.join(ROOT, n + ".png")).convert("RGBA")
+        # 12x30 = left frame on top, right frame below
+        save(f"legacy/{n}.png", im, frame=(12, 15), origin=(6, 14), max_colors=None,
+             anims={"left": {"frames": [0], "ms": 0}, "right": {"frames": [1], "ms": 0}})
 
 
 # ---------------------------------------------------------------------------
@@ -220,23 +278,29 @@ def build():
     it = art_tiles.interior_tiles(mega["floor_planks"])
     order = ["wall_top_l", "wall_top", "wall_top_r", "wall_bottom_l", "wall_bottom", "wall_bottom_r",
              "side_l", "side_r", "front_l", "front", "front_r", "void"]
+    caps = art_tiles.interior_tiles(None)           # transparent versions: drawn over any floor
+    cap_order = ["side_l", "side_r", "front", "front_l", "front_r"]
     cells = [mega["floor_planks"], mega["floor_planks_dark"], mega["cobble"]] + [it[k] for k in order]
-    interior = sheet(cells + [blank(16, 16)] * (16 - len(cells)), 16)
+    cells += [blank(16, 16)] * (16 - len(cells)) + [caps[k] for k in cap_order]
+    interior = sheet(cells + [blank(16, 16)] * (32 - len(cells)), 16)
     save("tiles/interior.png", interior, frame=(16, 16), per_tile=(16, 16), master=False,
          note="side/front pieces are drawn on floor_planks; use art_tiles.interior_tiles() overlays for other floors")
-    MANIFEST["assets"]["interior"]["tiles"] = {n: i for i, n in enumerate(
-        ["floor_planks", "floor_planks_dark", "cobble"] + order)}
+    names = {n: i for i, n in enumerate(["floor_planks", "floor_planks_dark", "cobble"] + order)}
+    names.update({"cap_" + k: 16 + i for i, k in enumerate(cap_order)})
+    MANIFEST["assets"]["interior"]["tiles"] = names
     made["interior_overlays"] = art_tiles.interior_tiles(None)
     made["interior"] = interior
 
     # ui ------------------------------------------------------------------------
     font, widths = art_ui.font_sheet()
     save("ui/font.png", font, frame=(art_ui.CELL_W, art_ui.CELL_H))
+    font_meta = {"cell": [art_ui.CELL_W, art_ui.CELL_H], "columns": 16, "baseline": 7,
+                 "line_height": art_ui.CELL_H + 1, "letter_spacing": 1,
+                 "glyphs": {ch: {"index": i, "width": widths[ch]} for i, ch in enumerate(art_ui.ORDER)}}
     with open(os.path.join(OUT, "ui", "font.json"), "w", encoding="utf8") as f:
-        json.dump({"cell": [art_ui.CELL_W, art_ui.CELL_H], "columns": 16, "baseline": 7,
-                   "line_height": art_ui.CELL_H + 1, "letter_spacing": 1,
-                   "glyphs": {ch: {"index": i, "width": widths[ch]} for i, ch in enumerate(art_ui.ORDER)}},
-                  f, ensure_ascii=False, indent=1)
+        json.dump(font_meta, f, ensure_ascii=False, indent=1)
+    with open(os.path.join(OUT, "ui", "font.lua"), "w", encoding="utf8") as f:
+        f.write("-- generated by tools/make_assets.py, do not edit\nreturn " + to_lua(font_meta) + "\n")
     made["font"] = font
     save("ui/dialog_box.png", art_ui.dialog_box_9slice(), note="9-slice, 8px borders")
     save("ui/hearts.png", sheet(art_items.hud_hearts(), 3), frame=(8, 8), note="full, half, empty")
@@ -248,9 +312,14 @@ def build():
     save("ui/slot_b.png", art_ui.item_slot("B"))
     made["logo"] = save("ui/logo.png", art_ui.logo())
 
+    export_legacy()
+
     MANIFEST["mega_skipped"] = [{"what": w, "why": y} for w, y in art_mega.SKIPPED]
     with open(os.path.join(OUT, "assets.json"), "w", encoding="utf8") as f:
         json.dump(MANIFEST, f, indent=1, ensure_ascii=False)
+    runtime = {k: v for k, v in MANIFEST.items() if k != "mega_skipped"}
+    with open(os.path.join(OUT, "manifest.lua"), "w", encoding="utf8") as f:
+        f.write("-- generated by tools/make_assets.py, do not edit\nreturn " + to_lua(runtime) + "\n")
     return made
 
 

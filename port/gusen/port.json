@@ -1,0 +1,29 @@
+{
+  "version": 2,
+  "name": "gusen.zip",
+  "items": [
+    "Gusen.sh",
+    "gusen"
+  ],
+  "items_opt": [],
+  "attr": {
+    "title": "Gusen",
+    "porter": [
+      "DankMiimer"
+    ],
+    "desc": "A small top-down adventure in the style of a GBA game. The candles in Gusenby are going out one by one, and red-eyed shadow Gusens are creeping in.",
+    "inst": "Ready to run. Needs a PortMaster with the LOVE 11.5 runtime.",
+    "genres": [
+      "action",
+      "adventure"
+    ],
+    "image": null,
+    "rtr": true,
+    "exp": true,
+    "runtime": null,
+    "reqs": [],
+    "arch": [
+      "aarch64"
+    ]
+  }
+}

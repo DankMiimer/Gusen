@@ -1,16 +1,52 @@
 # Gusen: rebuild plan
 
-**Short version:** throw away the current platformer code, keep the Gusens and
-the art, and rebuild it as a small **top-down GBA-style action-adventure**
-(think *Zelda: Minish Cap* on one cartridge). It runs at a true **240×160**,
-uses 16×16 tiles, and works on your handheld through PortMaster. A first set
-of matching pixel art is already in [`assets/`](assets/README.md).
+**Short version:** the platformer (`game.html`) is retired. Gusen is being
+rebuilt in **LÖVE 11.5** as a small **top-down GBA-style action-adventure**
+(think *Zelda: Minish Cap* on one cartridge) for **PortMaster on the Anbernic
+RG34XXSP**. It renders at a true **240×160**, which is exactly ⅓ of the
+RG34XXSP's 720×480 screen, so every pixel is a clean 3×3 block. **M0 (the
+foundation) is built and playable:** see [Status](#status) below. A first set
+of matching pixel art is already in [`game/assets/`](docs/ART_GUIDE.md).
 
 ![gameplay mockup, 240×160 at 4x](docs/img/mockup_gameplay_x4.png)
 
 *Every pixel above is a real 1x asset from this repo (new tiles and sprites,
 plus your candle, frog, mushroom, coin and lantern), scaled ×4. Nothing is
 painted over.*
+
+## Decided
+
+| Question | Decision |
+|---|---|
+| Engine | **LÖVE 11.5** (Lua): the runtime PortMaster ships |
+| Target | **PortMaster on the Anbernic RG34XXSP only.** 3.4" 720×480 (3:2), Allwinner H700 (4× Cortex-A53), Mali-G31 (OpenGL ES), 1–2 GB RAM. Every build is tested on a PC first (LÖVE, same code), then on the RG34XXSP. |
+| Language | **Norwegian and English**, switchable in the pause menu |
+| World | **Both:** big scrolling **areas** for the overworld (village, forest), single-screen **rooms** with slide transitions for houses, caves and dungeons |
+| Old version | `game.html` and the web launch scripts are **removed** |
+
+## Status
+
+**M0 is done**: `game/` runs on PC and is packaged for PortMaster (`port/`).
+What's in it:
+
+* 240×160 canvas, ×3 integer scaling on 720×480 (any window size on PC), fixed 60 Hz
+* Title screen: **press A once** and the game learns which button is A on your
+  device, then pick Norsk / English (saved; changeable in the pause menu)
+* Gusenby (2×2-screen scrolling area) → Skogen (scrolling forest) via the east
+  path; Spaghetti-Gusen's inn (room) through the door in the cliff; Mørk hule
+  (two rooms that slide into each other) through the cave
+* 8-way movement with foot-box collision and corner sliding, talking to NPCs and
+  signs, dialog with typewriter text in both languages, HUD, pause menu
+* Automated play-through test (`tests/tour.lua`): 8 checks, screenshots, also
+  run in OpenGL ES mode and through the real PortMaster launcher script
+
+| Title (first run) | Inn | Cave slide |
+|---|---|---|
+| ![title](docs/img/m0_title.png) | ![inn](docs/img/m0_kro.png) | ![slide](docs/img/m0_slide.png) |
+
+**Next: M1 (combat feel).** Before that, please run M0 on the RG34XXSP (see
+the README) and tell me how it feels, or send `gusen/log.txt` if it doesn't
+start.
 
 > **What I analyzed:** the GitHub repo `DankMiimer/Gusen` (branch `main`). I
 > can't reach `\\GAMEBOY\share\roms\ports\Top down game` from here because it's
@@ -96,7 +132,7 @@ porting, and the art and characters carry over without it.
 
 ## 2. The pixel art: what's there and the rules going forward
 
-Full style guide with every rule, file and frame: **[`assets/README.md`](assets/README.md)**.
+Full style guide with every rule, file and frame: **[`docs/ART_GUIDE.md`](docs/ART_GUIDE.md)**.
 
 ![existing art](docs/img/existing_art_x4.png)
 
@@ -120,14 +156,14 @@ There are three families:
 
 **Decision:** standardise on **AAP-64 + "Gusen ink"** (black, white, the red
 ramp): 74 colours, max 15 per sprite. The master palette is at
-`assets/palette/gusen-master.gpl`. The old DB32 and free-picked sprites still
+`game/assets/palette/gusen-master.gpl`. The old DB32 and free-picked sprites still
 look fine next to it. Mega pieces keep their own colours for now: they're
 copied pixel for pixel. A later cleanup step can move everything onto the
 palette (see M6).
 
 ### From the Mega sheet: chosen, not dumped in
 
-43 pieces go into the game (in `assets/mega/`, pixels untouched). **Everything
+43 pieces go into the game (in `game/assets/mega/`, pixels untouched). **Everything
 with a job is in:** all the tables, the cobblestone (it already repeats every
 16 px, so it tiles), floors, chairs, cabinets, dresser, bookshelf, rug, door and
 windows, candle stands and the 4-frame candle dish, the lantern, food, the
@@ -135,7 +171,7 @@ wallet, pines, the hollow log, sunflowers and the golden throne. **Left out:**
 the second grass family and dirt ring (they clash with the overworld grass),
 the cave hole (duplicate), the TVs (low contrast), the aquarium and pink
 loveseat (37 and 20 colours) and near-duplicates. The full table with reasons
-is in [`assets/README.md`](assets/README.md#mega_spritesheetase-whats-used-and-why).
+is in [`docs/ART_GUIDE.md`](docs/ART_GUIDE.md#mega_spritesheetase-whats-used-and-why).
 
 ![Mega picks](docs/img/mega_picks_x3.png)
 
@@ -198,16 +234,20 @@ Explore a screen → fight or solve it → earn coins, shards, keys → get a ne
 tool from a villager or dungeon → it opens new screens → relight that area's
 candle (checkpoint and story beat).
 
-### Controls (GBA layout)
+### Controls (GBA layout on the RG34XXSP)
 
-| | Handheld / pad | Keyboard |
+| | RG34XXSP | Keyboard (PC testing) |
 |---|---|---|
-| Move (8-way) | D-pad / stick | Arrows / WASD |
-| Sword | A | Z / J |
+| Move (8-way) | D-pad / left stick | Arrows / WASD |
+| Talk, sword | A | Z / J / Space |
 | Use item | B | X / K |
-| Dodge-roll (later) | R | Shift |
-| Map | L / Select | Tab |
-| Pause / items | Start | Enter / Esc |
+| Dodge-roll (later) | R1 | E / Shift |
+| Map (later) | L1 / Select | Q / Tab |
+| Pause menu | Start | Enter / Esc |
+| Quit | Start → *Quit*, or Select + Start (PortMaster hotkey) | Esc → *Quit* |
+
+Which physical button SDL calls "a" differs between firmwares, so the title
+screen asks you to press A once and remembers it (redo it under *Set up A/B*).
 
 ### Your existing art, put to work
 
@@ -261,18 +301,23 @@ with flicker, 24 px knockback on enemies.
 
 ### World
 
-Single-screen rooms (15×10 tiles, exactly one GBA screen) with a slide
-transition between them, like *Link's Awakening*. This is easy to build and
-design, and it looks and plays like the real thing.
+Two kinds of maps, both already working in M0:
+
+* **Areas** (overworld): any size, the camera follows the Gusen and stops at
+  the edges, like *Minish Cap*. Walking off a path at the edge fades to the
+  next area.
+* **Rooms** (houses, caves, dungeons): exactly 15×10 tiles = one screen.
+  Neighbouring rooms **slide** in, like *Link's Awakening*. That's ideal for
+  puzzle rooms and boss rooms.
 
 | Area | Screens | New thing |
 |---|---|---|
-| **Gusenby** (hub) | 6 | Village, shop, the Big Candle |
-| **Skogen** (forest) | 8 | Grass cutting, frogs, mushrooms |
-| **Mørk hule** (dark cave) | 6 | **Lantern**, darkness, first boss |
-| Verkstedet (workshop) | 8 | **Microwave bombs**, mimics |
-| Myra (marsh) | 8 | Water, lily pads, **frog hop** |
-| Skyggeslottet (shadow keep) | 10 | Everything together; Skyggekongen |
+| **Gusenby** (hub) | area, ~6 screens + houses (rooms) | Village, shop, the Big Candle |
+| **Skogen** (forest) | area, ~8 screens | Grass cutting, frogs, mushrooms |
+| **Mørk hule** (dark cave) | 6 rooms | **Lantern**, darkness, first boss |
+| Verkstedet (workshop) | 8 rooms | **Microwave bombs**, mimics |
+| Myra (marsh) | area, ~8 screens | Water, lily pads, **frog hop** |
+| Skyggeslottet (shadow keep) | 10 rooms | Everything together; Skyggekongen |
 
 **Vertical slice** = Gusenby + Skogen + Mørk hule (~20 screens, ~15 minutes).
 Build this completely before the rest.
@@ -281,50 +326,70 @@ Build this completely before the rest.
 
 ## 4. Tech
 
-### Recommendation: rebuild in **LÖVE 11.x (Lua)**
+### LÖVE 11.5 on PortMaster, RG34XXSP only
 
-The game lives in `roms/ports/`, which means a **PortMaster** handheld. A
-browser game can't run there. PortMaster ships a LÖVE runtime, so a LÖVE game
-runs on the handheld with no ARM compiling. The same folder also runs on
-Windows, macOS and Linux for development. LÖVE handles gamepads, pixel-perfect
-canvases and save files out of the box.
+PortMaster ships the `love_11.5` runtime (`$controlfolder/runtimes/love_11.5/`),
+so the port is just Lua code and art: no ARM compiling, and the same folder runs
+on your PC for testing. The launcher follows PortMaster's current LÖVE template
+(`port/Gusen.sh`).
 
-*(If you only ever want to play it in a browser, the same architecture works
-in plain JS. Tell me and the plan stays the same apart from the language.)*
+**RG34XXSP facts that shape the code:**
 
-### Architecture
+* **720×480 = 3 × 240×160.** The game fills the screen with no borders and no
+  uneven pixels. Nothing needs a "fit" mode.
+* **H700 + Mali-G31, OpenGL ES.** No shaders so far. Ground tiles are drawn as
+  sprite batches, and objects outside the view are skipped. Every build is also
+  tested with LÖVE forced into OpenGL ES mode.
+* **Buttons:** D-pad, two sticks, A/B/X/Y, L1/R1/L2/R2, Start, Select, Menu.
+  PortMaster provides the SDL gamepad mapping, and the game learns which button
+  is A on first start.
 
-* **Fixed 60 Hz update** with an accumulator. The game plays the same on every
-  screen.
-* **Draw everything to a 240×160 canvas** (nearest filter), then draw that
-  canvas at the largest whole-number scale that fits, centred. On a 640×480
-  handheld that's ×2 with borders; offer an optional "fill" mode.
-* Sprite positions are rounded to whole pixels at draw time. No rotation, no
-  alpha fades (flicker instead), except the drop-shadow layer.
-* **Collision:** a per-axis AABB against the tile grid. Characters collide with
-  a small **8×5 foot box**, so the body can overlap walls in top-down view.
-  Hurtboxes are separate from the collision box.
-* **Data-driven:** `assets/assets.json` (already generated) defines frames,
-  origins and animations. Rooms are made in **Tiled** (free), exported to Lua,
-  with object layers for NPCs, enemies, chests and candles.
-* **Text** lives in `lang/no.lua` and `lang/en.lua`. The font already has ÆØÅ.
-* **Audio:** SFX from jsfxr (free, chip-style); music in BeepBox or Furnace.
-* **Save:** one small file via `love.filesystem`, written when you light a
-  candle.
+### Architecture (as built in M0)
+
+* **Fixed 60 Hz update** with an accumulator (max 4 catch-up steps). Tests run
+  exactly one step per frame so they're deterministic.
+* **240×160 canvas** (nearest filter) drawn at the largest whole-number scale
+  that fits, centred. Screen fades use 8 brightness steps, like the GBA's fade
+  register.
+* **Maps are Lua files** (`game/maps/`): ASCII ground rows + an object list.
+  Paths, water, cliffs, plateau rims, interior walls and pine forests are
+  autotiled on load. Exits can be limited to the tiles where a path actually
+  leaves the map. (Tiled can come later if hand-editing gets slow.)
+* **Collision:** an 8×5 foot box against solid tiles, object footprints and
+  wall strips, with corner sliding.
+* **Data-driven art:** `tools/make_assets.py` writes `game/assets/manifest.lua`
+  (frames, origins, animations, tile names). Your original sprites are exported
+  unchanged to `game/assets/legacy/`.
+* **Text:** `game/lang/no.lua` and `game/lang/en.lua` (same keys; dialog can be
+  several pages). Custom pixel font with ÆØÅ.
+* **Saves/settings:** `love.filesystem`; on the device that's
+  `roms/ports/gusen/saves/`.
 
 ```
-gusen/
-  main.lua  conf.lua
-  src/core/     input, scene stack, timer, anim, assets, audio, save
-  src/world/    room, tilemap (+autotile), collision, camera/transition
-  src/actors/   player, skyggegusen, bat, frog, fluesopp, mimic, npc, pickup, candle
-  src/ui/       font, hud, dialog, menu
-  src/scenes/   title, play, pause, gameover
-  assets/       ← this repo's assets/
-  maps/         Tiled rooms
-  lang/         no.lua, en.lua
-  port/         PortMaster launcher script + port.json
+game/                 the LÖVE project (this folder is gamedata/ on the handheld)
+  main.lua conf.lua
+  src/core/           screen, input (+ A/B calibration), settings, i18n, assets, anim, font, scenes, autotest
+  src/world/          map (+autotile, collision), props, npc, player, overlays
+  src/ui/             hud, dialog
+  src/scenes/         boot (title), play, pause
+  maps/               gusenby, skogen (areas); kro, hule1, hule2 (rooms)
+  lang/               no.lua, en.lua
+  tests/              scripted play-throughs (not shipped to the device)
+  assets/             generated by tools/make_assets.py
+port/                 Gusen.sh + gusen/ (port.json, README, licenses)
+tools/                make_assets.py, package_port.py
 ```
+
+### Testing: PC first, then the RG34XXSP
+
+1. **Automated (every change):** `GUSEN_AUTOTEST=tour love game` plays through
+   title → village → talking → inn → cave slide → pause (language switch) →
+   forest, checks 8 things and saves screenshots. It also runs in OpenGL ES
+   mode, and through `port/Gusen.sh` against a stand-in PortMaster to check
+   the launcher.
+2. **You on PC:** `Test on PC.bat` (needs LÖVE 11.5 for Windows).
+3. **You on the RG34XXSP:** `Install to RG34XXSP.bat` copies the port to
+   `\\GAMEBOY\share\roms\ports`; start *Gusen* from Ports.
 
 ---
 
@@ -334,11 +399,11 @@ Each milestone ends in something you can play.
 
 | # | Milestone | Done when… |
 |---|---|---|
-| **M0** | **Foundations**: LÖVE skeleton, 240×160 canvas and integer scaling, fixed timestep, keyboard + gamepad input, asset loader from `assets.json`, draw one Tiled room | The Gusen walks around one room with walls at a steady 60 fps |
+| **M0 ✅** | **Foundations**: LÖVE 11.5, 240×160 ×3, fixed timestep, gamepad (A/B calibration) + keyboard, assets from the manifest, areas + rooms, doors, slide transitions, dialog in Norwegian and English, pause menu, **PortMaster package** | Done on PC. **Waiting for your RG34XXSP test** |
 | **M1** | **Combat feel**: sword and slash, hit-stop, knockback, i-frames, Skyggegusen AI, HUD hearts and coins, death → respawn at a candle | Fighting 3 Skyggegusens in one room is fun for 2 minutes |
-| **M2** | **World systems**: room slide transitions, cuttable grass and bushes with drops, pots, chests, keys and locked doors, dialog boxes, candle checkpoint + save, pause menu | You can walk through 5 connected rooms, talk, save, quit and continue |
+| **M2** | **World systems**: cuttable grass and bushes with drops, pots, chests, keys and locked doors, candle checkpoint + save/continue | You can walk through 5 connected rooms, save, quit and continue |
 | **M3** | **Vertical slice**: Gusenby, Skogen, Mørk hule; bat, frog and mushroom; lantern and darkness; mini-boss; title screen | 3 friends play it start to finish without help, and you fix what they trip on |
-| **M4** | **Handheld port**: PortMaster package, controls, scaling and performance tested on the device | It boots from `roms/ports` and plays well |
+| **M4** | **Handheld pass**: after the vertical slice, a dedicated round on the RG34XXSP: performance with many enemies, battery, suspend/resume, sound levels | 30 minutes on the device without a hiccup |
 | **M5** | **Full game**: Verkstedet, Myra, Skyggeslottet, microwave bombs, seeds and flowers, frog hop, Skyggekongen, ending | Beatable in about 2 hours |
 | **M6** | **Polish**: music, SFX pass, screen shake, text speed and remapping options, balance; move DB32, MS Paint-colour and Mega sprites onto the master palette (Mega bookshelf: 30 → 15 colours); fix `generatorgusen.png` alpha | Nothing embarrassing left in a 30-minute session |
 
@@ -355,11 +420,9 @@ Each milestone ends in something you can play.
 
 ---
 
-## 6. Decisions I need from you
+## 6. What I need from you
 
-1. **Platform:** handheld (PortMaster) + PC → **LÖVE** (my recommendation).
-   Browser only → JS.
-2. **Language:** Norwegian, English or both? (Font and text files support both.)
-3. **Rooms:** single-screen rooms (recommended) or big scrolling areas?
-4. **Old platformer:** retire `game.html` entirely? The side-view terrain lives
-   on as the cliff face, and the rest carries over as art.
+* Run M0 on the RG34XXSP: does it start? Does "press A" pick the right
+  button? Does movement feel right? If it doesn't start, send
+  `roms/ports/gusen/log.txt`.
+* Anything you want changed in the direction before combat (M1) goes in.

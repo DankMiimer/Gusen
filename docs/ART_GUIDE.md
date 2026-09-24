@@ -1,5 +1,8 @@
 # Gusen art: style guide and asset catalogue
 
+The files live in `game/assets/` (what the game loads) and `art/ase/`
+(editable Aseprite copies).
+
 All art here is authored at **1x** and is pixel perfect: every pixel is a colour
 from the master palette, and alpha is 0 or 255. The one exception is the drop
 shadow, which is 50% black. Nothing is resampled. The game renders to a
@@ -10,10 +13,10 @@ Rebuild everything with:
 
 ```bash
 pip install pillow
-python3 tools/make_assets.py      # writes assets/, assets/ase/, docs/img/
+python3 tools/make_assets.py      # writes game/assets/, art/ase/, docs/img/
 ```
 
-![gameplay mockup](../docs/img/mockup_gameplay_x4.png)
+![gameplay mockup](img/mockup_gameplay_x4.png)
 
 ## The rules (taken from the art you already made)
 
@@ -32,7 +35,7 @@ python3 tools/make_assets.py      # writes assets/, assets/ase/, docs/img/
 Palette file for Aseprite / GIMP: `palette/gusen-master.gpl`
 (Aseprite: *Palette → Load Palette*).
 
-![palette](../docs/img/palette_x4.png)
+![palette](img/palette_x4.png)
 
 ## What's here
 
@@ -58,11 +61,11 @@ Palette file for Aseprite / GIMP: `palette/gusen-master.gpl`
 | `ui/slot_a.png` `slot_b.png` `cursor.png` `more_arrow.png` `logo.png` | | |
 | `ase/*.ase` | | every animated sprite as an Aseprite file with **tags per animation** and the master palette loaded |
 
-![all new assets](../docs/img/new_assets_x3.png)
+![all new assets](img/new_assets_x3.png)
 
 Tile indices for level data (Tiled etc.):
 
-![tile indices](../docs/img/tiles_labeled_x4.png)
+![tile indices](img/tiles_labeled_x4.png)
 
 ### Autotiles (path and water)
 
@@ -88,9 +91,9 @@ green family (`#61a53f`, `#477238`).
 
 Picks are copied **pixel for pixel**: no recolouring, no scaling. Each one has
 a job in the game (listed in `assets.json` → `note`). The build writes them to
-`assets/mega/`.
+`game/assets/mega/`.
 
-![curated Mega picks](../docs/img/mega_picks_x3.png)
+![curated Mega picks](img/mega_picks_x3.png)
 
 | Picked | Job |
 |---|---|
@@ -125,21 +128,21 @@ spines). Reduce it in the palette pass.
 
 | Interior (Mega furniture + new walls) | Forest (Mega pines, log, cobblestone) |
 |---|---|
-| ![interior](../docs/img/mockup_interior_x4.png) | ![forest](../docs/img/mockup_forest_x4.png) |
+| ![interior](img/mockup_interior_x4.png) | ![forest](img/mockup_forest_x4.png) |
 
 ### The existing art these build on
 
 JPGs are excluded (lossy, so they can't be pixel perfect).
 
-![existing art](../docs/img/existing_art_x4.png)
+![existing art](img/existing_art_x4.png)
 
 ## Workflow
 
 * `tools/make_assets.py` is the source of truth for everything in this folder
   right now. It checks every sheet against the palette and the 15-colour rule,
   and fails the build if either is broken.
-* Want to hand-edit something? Open `assets/ase/<name>.ase` in Aseprite, then
-  export PNG over `assets/<folder>/<name>.png` (*File → Export Sprite Sheet*,
+* Want to hand-edit something? Open `art/ase/<name>.ase` in Aseprite, then
+  export PNG over `game/assets/<folder>/<name>.png` (*File → Export Sprite Sheet*,
   by rows, no padding). After that, **remove that sprite from
   `make_assets.py`** so the generator doesn't overwrite your edit.
 * Never scale inside the art. If something needs to be bigger, draw it bigger
